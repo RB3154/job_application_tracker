@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+{% block content %}
+  {% for post in posts %}
+    <article class="content-section py-3 px-4 mb-4">
+      <div class="d-flex align-items-start gap-4">
+        <img class="rounded-circle article-img flex-shrink-0"
+             src="{{ url_for('static', path='profile_pics/default.jpg') }}"
+             alt="{{ post.author }}'s profile picture"
+             width="64"
+             height="64"
+             loading="lazy">
+        <div class="flex-grow-1">
+          <div class="article-metadata mb-2">
+            <h2>
+            <a class="article-title" href="#">{{ post.role }}</a>
+          </h2>
+          </div>
+          <h2>
+            <a class="article-title" href="#">{{ post.company }}</a>
+          </h2>
+          <p class="article-content">{{ post.date_applied }}</p>
+          <p class="article-content">{{ post.status }}</p>
+        </div>
+      </div>
+    </article>
+  {% endfor %}
+{% endblock content %}
