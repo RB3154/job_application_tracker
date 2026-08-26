@@ -6,21 +6,28 @@ This project is being developed as a practical backend project while learning an
 
 ## 🚧 Current Status
 
-**Phase 1: Initial UI**
+**Phase 2: FastAPI Fundamentals + Application Pages + Error Handling**
 
 The project currently contains:
 
 * FastAPI application setup
 * Web-based dashboard UI
 * Job application cards
+* Individual job application pages
 * Application status display
 * Sidebar navigation
 * Navigation bar
 * Dark mode UI
 * Static assets and HTML templates
-* Responsive frontend structure
+* Jinja2 template rendering
+* Dynamic URL path parameters
+* JSON API endpoints
+* Custom HTTP exception handling
+* Custom request validation error handling
+* Separate HTML and JSON error responses
+* In-memory job application data
 
-The application is currently focused on establishing the core UI and project structure. Backend functionality and database-driven features will be added incrementally.
+The current implementation uses Python data structures to store job applications. Database persistence and more advanced backend functionality will be added incrementally.
 
 ## 🛠️ Tech Stack
 
@@ -53,9 +60,86 @@ job_application_tracker/
 │   └── ...
 │
 └── templates/
-    ├── ...
-    └── ...
+    ├── error.html
+    ├── home.html
+    ├── layout.html
+    └── post.html
 ```
+
+## ⚙️ Current Backend Functionality
+
+### Web Routes
+
+The application currently provides HTML pages for:
+
+```text
+GET /
+GET /posts
+GET /posts/{post_id}
+```
+
+The `/posts/{post_id}` route uses a dynamic path parameter to display an individual job application.
+
+### API Routes
+
+The application also provides JSON API endpoints:
+
+```text
+GET /api/posts
+GET /api/posts/{post_id}
+```
+
+These endpoints currently return the job application data stored in memory.
+
+### Error Handling
+
+The application includes custom exception handlers for:
+
+* HTTP exceptions
+* Request validation errors
+
+The application distinguishes between API requests and normal webpage requests.
+
+```text
+Browser request
+      ↓
+HTML error page
+
+API request
+      ↓
+JSON error response
+```
+
+For example, requesting a job application that does not exist produces a `404 Not Found` response.
+
+Invalid path parameters are handled using FastAPI's request validation system and return a `422 Unprocessable Content` response.
+
+## 📊 Current Data Model
+
+Job applications are currently represented using Python dictionaries.
+
+Each application contains information such as:
+
+* ID
+* Role
+* Company
+* Location
+* Date applied
+* Application status
+
+Example:
+
+```text
+Job Application
+├── id
+├── role
+├── company
+├── location
+├── date_applied
+└── status
+```
+
+At this stage, the data is stored in memory rather than a database.
 
 ## 🚀 Running Locally
 
@@ -114,6 +198,12 @@ The development process will progressively move from:
 FastAPI Fundamentals
         ↓
 Frontend / Templates
+        ↓
+Dynamic Routes
+        ↓
+API Endpoints
+        ↓
+Error Handling
         ↓
 Database Integration
         ↓
