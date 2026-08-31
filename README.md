@@ -1,229 +1,234 @@
 # Job Application Tracker
 
-A personal **Job Application Tracker / ATS** built with **FastAPI** to help manage and track job applications throughout the job search process.
+A personal Job Application Tracker being built with FastAPI and
+PostgreSQL. The project is developed incrementally while learning
+FastAPI concepts, with tutorial material progressively adapted into an
+application-specific architecture.
 
-This project is being developed as a practical backend project while learning and applying FastAPI concepts.
+## Current Status
 
-## 🚧 Current Status
+The database and model foundation is implemented and the initial schema
+migration has been applied successfully.
 
-**Phase 2: FastAPI Fundamentals + Application Pages + Error Handling**
+### Implemented
 
-The project currently contains:
+-   FastAPI application with a Job Application Tracker home route
+-   Jinja2 template configuration and static-file mounting
+-   HTML and JSON-oriented exception handling
+-   PostgreSQL connection configuration loaded from `.env`
+-   SQLAlchemy 2.x ORM models for the tracker schema
+-   Core Pydantic schemas for `Company`, `Job`, and `Application`
+-   Alembic configuration and an applied initial migration
+-   PostgreSQL database with the 14-table application schema
 
-* FastAPI application setup
-* Web-based dashboard UI
-* Job application cards
-* Individual job application pages
-* Application status display
-* Sidebar navigation
-* Navigation bar
-* Dark mode UI
-* Static assets and HTML templates
-* Jinja2 template rendering
-* Dynamic URL path parameters
-* JSON API endpoints
-* Custom HTTP exception handling
-* Custom request validation error handling
-* Separate HTML and JSON error responses
-* In-memory job application data
+The current application does **not** yet include CRUD operations, job
+API endpoints, routers, authentication, or a database-backed dashboard.
 
-The current implementation uses Python data structures to store job applications. Database persistence and more advanced backend functionality will be added incrementally.
+The `templates/` and `static/` directories are retained from the
+learning/reference implementation and will be tailored to the Job
+Application Tracker as development progresses.
 
-## 🛠️ Tech Stack
+## Technology Stack
 
-* Python
-* FastAPI
-* Uvicorn
-* Pydantic
-* Jinja2 Templates
-* HTML
-* CSS
-* JavaScript
-* uv
-* Git & GitHub
+-   Python 3.11+
+-   FastAPI
+-   Uvicorn
+-   Jinja2
+-   PostgreSQL
+-   SQLAlchemy 2.x
+-   psycopg
+-   Pydantic
+-   pydantic-settings
+-   Alembic
+-   uv
 
-## 📂 Project Structure
+## Project Structure
 
-```text
+``` text
 job_application_tracker/
-│
+├── alembic/
+│   ├── versions/
+│   │   └── 09f2cd3da047_initial_schema.py
+│   ├── env.py
+│   ├── README
+│   └── script.py.mako
+├── static/
+├── templates/
+├── .env
 ├── .gitignore
 ├── .python-version
-├── README.md
+├── alembic.ini
+├── CODING_INSTRUCTIONS.md
+├── create_db.sql
+├── database.py
+├── FINAL_SCHEMA.md
 ├── main.py
+├── models.py
 ├── pyproject.toml
-├── uv.lock
-│
-├── static/
-│   ├── css/
-│   ├── js/
-│   └── ...
-│
-└── templates/
-    ├── error.html
-    ├── home.html
-    ├── layout.html
-    └── post.html
+├── README.md
+├── schemas.py
+└── uv.lock
 ```
 
-## ⚙️ Current Backend Functionality
+Local/generated files such as `.venv/`, `__pycache__/`, and `.vscode/`
+may exist in the workspace but are not source files intended for the
+repository.
 
-### Web Routes
+## Application Entry Point
 
-The application currently provides HTML pages for:
+Run:
 
-```text
-GET /
-GET /posts
-GET /posts/{post_id}
-```
-
-The `/posts/{post_id}` route uses a dynamic path parameter to display an individual job application.
-
-### API Routes
-
-The application also provides JSON API endpoints:
-
-```text
-GET /api/posts
-GET /api/posts/{post_id}
-```
-
-These endpoints currently return the job application data stored in memory.
-
-### Error Handling
-
-The application includes custom exception handlers for:
-
-* HTTP exceptions
-* Request validation errors
-
-The application distinguishes between API requests and normal webpage requests.
-
-```text
-Browser request
-      ↓
-HTML error page
-
-API request
-      ↓
-JSON error response
-```
-
-For example, requesting a job application that does not exist produces a `404 Not Found` response.
-
-Invalid path parameters are handled using FastAPI's request validation system and return a `422 Unprocessable Content` response.
-
-## 📊 Current Data Model
-
-Job applications are currently represented using Python dictionaries.
-
-Each application contains information such as:
-
-* ID
-* Role
-* Company
-* Location
-* Date applied
-* Application status
-
-Example:
-
-```text
-Job Application
-├── id
-├── role
-├── company
-├── location
-├── date_applied
-└── status
-```
-
-At this stage, the data is stored in memory rather than a database.
-
-## 🚀 Running Locally
-
-### Install dependencies
-
-```bash
+``` bash
 uv sync
-```
-
-### Start the development server
-
-```bash
 uv run uvicorn main:app --reload
 ```
 
-The application will be available at:
+Application: `http://127.0.0.1:8000`
 
-```text
-http://127.0.0.1:8000
+FastAPI docs: `http://127.0.0.1:8000/docs`
+
+Current implemented route:
+
+``` text
+GET /
 ```
 
-### API Documentation
+`main.py` mounts static files at `/static` and configures Jinja2
+templates from `templates/`. The previous in-memory post/blog data and
+`/posts` / `/api/posts` routes are no longer part of the application.
 
-FastAPI automatically provides interactive API documentation at:
+## Database and ORM
 
-```text
-http://127.0.0.1:8000/docs
+`database.py` loads `DATABASE_URL` from `.env` and configures a
+PostgreSQL SQLAlchemy engine using the psycopg driver. It also provides
+the declarative `Base`, session factory, and FastAPI-ready
+database-session dependency.
+
+`models.py` defines the SQLAlchemy 2.x ORM layer.
+
+The current database schema contains these 14 application tables:
+
+``` text
+application
+company
+company_location
+education_requirement
+job
+job_education
+job_location
+job_skill
+job_source
+job_work_mode
+location
+skill
+source
+work_mode
 ```
 
-## 🎯 Project Goal
+`FINAL_SCHEMA.md` is the authoritative specification for these tables,
+including columns, relationships, constraints, defaults, and indexes.
 
-The long-term goal is to evolve this project into a personal **Job Application Tracker / ATS** that can be genuinely used during the job search.
+## PostgreSQL Database Creation
 
-Planned functionality includes:
+`create_db.sql` contains the SQL used to create the PostgreSQL database:
 
-* Creating and managing job applications
-* Tracking application status
-* Storing company and role information
-* Tracking application dates
-* Updating application progress
-* Searching and filtering applications
-* Database persistence
-* Authentication
-* Dashboard statistics
-* Additional ATS-style features
-
-The project will be developed incrementally, with each stage introducing new backend and application-development concepts.
-
-## 📌 Development Approach
-
-The project is being built alongside learning **FastAPI**, with an emphasis on understanding the concepts rather than simply assembling a finished application.
-
-The development process will progressively move from:
-
-```text
-FastAPI Fundamentals
-        ↓
-Frontend / Templates
-        ↓
-Dynamic Routes
-        ↓
-API Endpoints
-        ↓
-Error Handling
-        ↓
-Database Integration
-        ↓
-CRUD Operations
-        ↓
-Authentication
-        ↓
-Application Tracking
-        ↓
-Personal ATS
+``` sql
+CREATE DATABASE job_application_tracker;
 ```
 
-More functionality will be added as the project develops.
+The application schema is managed through SQLAlchemy models and Alembic
+migrations.
 
-## 📚 Learning Reference
+## Pydantic Schemas
 
-This project is being developed while following **Corey Schafer's FastAPI tutorial series** as a learning reference.
+`schemas.py` currently contains:
 
-The project's current HTML templates, styling, and parts of the `main.py` structure are based on or adapted from the tutorial's examples. These files and patterns are being used for learning and understanding FastAPI concepts.
+-   `CompanyBase`, `CompanyCreate`, `CompanyResponse`
+-   `JobBase`, `JobCreate`, `JobResponse`
+-   `ApplicationBase`, `ApplicationCreate`, `ApplicationResponse`
 
-As development progresses, the project will increasingly incorporate my own implementation, architecture, features, and modifications to turn it into a personal Job Application Tracker / ATS.
+Response schemas use `from_attributes=True` so they can later be
+populated from SQLAlchemy model instances.
 
-**Credit:** Corey Schafer, for the FastAPI tutorial series used as a learning reference.
+These schemas are defined but are not yet connected to CRUD operations
+or database-backed API endpoints.
+
+## Alembic Migrations
+
+The initial migration has been applied to the configured PostgreSQL
+database:
+
+``` text
+Revision: 09f2cd3da047
+Message: initial schema
+Status: head
+```
+
+Commands:
+
+``` bash
+uv run alembic upgrade head
+uv run alembic current
+```
+
+Database schema changes should be managed through reviewed Alembic
+migrations rather than `Base.metadata.create_all()`.
+
+## Supporting Files
+
+-   `.env` - Local PostgreSQL configuration; do not commit secrets.
+-   `.gitignore` - Excludes local/generated files and environment
+    secrets from Git.
+-   `.python-version` - Specifies the project's Python version.
+-   `alembic.ini` - Alembic configuration.
+-   `CODING_INSTRUCTIONS.md` - Project implementation guidance.
+-   `create_db.sql` - PostgreSQL database creation script.
+-   `FINAL_SCHEMA.md` - Authoritative database schema specification.
+-   `pyproject.toml` - Project configuration and dependencies.
+-   `uv.lock` - Locked dependency versions.
+
+## Planned Next Steps
+
+The following are planned and are not implemented yet:
+
+-   CRUD operations for jobs, companies, and applications
+-   Database-backed API endpoints
+-   FastAPI route organization with routers
+-   Connecting templates to persisted data
+-   Search and filtering
+-   Application-status workflows
+-   Authentication and authorization
+-   Dashboard statistics
+-   Additional ATS-style features
+
+## Development Approach
+
+The project is being built alongside Corey Schafer's FastAPI tutorial
+rather than attempting to implement the entire application at once.
+
+``` text
+FastAPI Tutorial Concept
+        ↓
+Understand the concept
+        ↓
+Adapt it to Job Application Tracker
+        ↓
+Implement it in the project
+        ↓
+Move to the next concept
+```
+
+The goal is to learn each FastAPI concept and immediately apply it to
+the Job Application Tracker.
+
+## Learning Reference
+
+Corey Schafer's FastAPI tutorial series is the learning reference for
+this project. Existing `templates/` and `static/` assets, along with
+parts of the initial FastAPI structure, originated from or were adapted
+while following the tutorial.
+
+The project is progressively being reshaped into an independent Job
+Application Tracker with its own PostgreSQL schema, SQLAlchemy ORM
+models, Pydantic schemas, Alembic migrations, and planned application
+features.

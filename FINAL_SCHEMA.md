@@ -1,0 +1,590 @@
+## Job Table
+
+### TABLE NAME
+`job`
+
+### Purpose:
+Stores information about individual job postings.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `job_id` | `VARCHAR(100)` | NOT NULL |
+| `role` | `VARCHAR(255)` | NOT NULL |
+| `JD` | `TEXT` | NOT NULL |
+| `job_url` | `TEXT` | NOT NULL |
+| `job_posting_date` | `DATE` | NOT NULL |
+| `application_deadline` | `DATE` | NULL |
+| `exp_min` | `DECIMAL(4,1)` | NULL |
+| `exp_max` | `DECIMAL(4,1)` | NULL |
+| `exp_text` | `TEXT` | NULL |
+| `salary_text` | `TEXT` | NULL |
+| `salary_min` | `DECIMAL(15,2)` | NULL |
+| `salary_max` | `DECIMAL(15,2)` | NULL |
+| `salary_currency` | `CHAR(3)` | NULL |
+| `salary_period` | `VARCHAR(20)` | NULL |
+| `company_id` | `VARCHAR(100)` | NOT NULL |
+
+### Primary Key:
+- `job_id`
+
+### Foreign Keys:
+- `company_id` → `company.company_id`
+
+### Unique constraints:
+- `job_id`
+- `job_url`
+
+### Check constraints:
+- `application_deadline >= job_posting_date`
+- `exp_min >= 0`
+- `exp_max >= 0`
+- `exp_max >= exp_min`
+- `salary_min >= 0`
+- `salary_max >= 0`
+- `salary_max >= salary_min`
+
+### Default values:
+- None
+
+### Indexes:
+- `job_id` - Primary key index.
+- `job_url` - Unique constraint index.
+- `role`
+- `job_posting_date`
+- `application_deadline`
+- `company_id`
+
+### Relationships:
+- `company` → `job`: One-to-Many
+- `job` → `company`: Many-to-One
+- `job` → `location`: Many-to-Many through `job_location`
+- `job` → `work_mode`: Many-to-Many through `job_work_mode`
+- `job` → `skill`: Many-to-Many through `job_skill`
+- `job` → `education_requirement`: Many-to-Many through `job_education`
+- `job` → `source`: Many-to-Many through `job_source`
+- `job` → `application`: One-to-Zero-or-One
+
+
+## Company Table
+
+### TABLE NAME
+`company`
+
+### Purpose:
+Stores information about companies that offer job postings.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `company_id` | `VARCHAR(100)` | NOT NULL |
+| `company_name` | `VARCHAR(255)` | NOT NULL |
+| `company_site` | `TEXT` | NULL |
+| `company_description` | `TEXT` | NULL |
+
+### Primary Key:
+- `company_id`
+
+### Foreign Keys:
+- None
+
+### Unique constraints:
+- None
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- `company_id` - Primary key index.
+
+### Relationships:
+- `company` → `job`: One-to-Many
+- `company` → `location`: Many-to-Many through `company_location`
+
+
+## Application Table
+
+### TABLE NAME
+`application`
+
+### Purpose:
+Stores information about a user's application to a job posting, including the date of application and its current status.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `application_id` | `INT` | NOT NULL |
+| `job_id` | `VARCHAR(100)` | NOT NULL |
+| `date_applied` | `DATE` | NOT NULL |
+| `current_status` | `VARCHAR(30)` | NULL |
+
+### Primary Key:
+- `application_id`
+
+### Foreign Keys:
+- `job_id` → `job.job_id`
+
+### Unique constraints:
+- `application_id`
+- `job_id`
+
+### Check constraints:
+- `current_status IN ('Applied', 'Screening', 'Interview', 'Rejected', 'Offer', 'Accepted', 'Withdrawn')`
+
+### Default values:
+- `date_applied` → `CURRENT_DATE`
+- `current_status` → `'Applied'`
+
+### Indexes:
+- `application_id` - Primary key index.
+- `job_id` - Unique constraint index.
+- `date_applied`
+
+### Relationships:
+- `application` → `job`: Many-to-One
+- `job` → `application`: One-to-Zero-or-One
+
+
+## Location Table
+
+### TABLE NAME
+`location`
+
+### Purpose:
+Stores locations that can be associated with job postings and companies.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `loc_id` | `INT` | NOT NULL |
+| `name` | `VARCHAR(100)` | NOT NULL |
+
+### Primary Key:
+- `loc_id`
+
+### Foreign Keys:
+- None
+
+### Unique constraints:
+- `name`
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- `loc_id` - Primary key index.
+- `name` - Unique constraint index.
+
+### Relationships:
+- `location` → `job`: Many-to-Many through `job_location`
+- `location` → `company`: Many-to-Many through `company_location`
+
+
+## Work Mode Table
+
+### TABLE NAME
+`work_mode`
+
+### Purpose:
+Stores the available work modes for job postings.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `work_mode_id` | `INT` | NOT NULL |
+| `name` | `VARCHAR(30)` | NOT NULL |
+
+### Primary Key:
+- `work_mode_id`
+
+### Foreign Keys:
+- None
+
+### Unique constraints:
+- `name`
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- `work_mode_id` - Primary key index.
+- `name` - Unique constraint index.
+
+### Relationships:
+- `work_mode` → `job`: Many-to-Many through `job_work_mode`
+
+
+## Skill Table
+
+### TABLE NAME
+`skill`
+
+### Purpose:
+Stores skills that can be associated with job postings.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `skill_id` | `INT` | NOT NULL |
+| `skill_name` | `VARCHAR(100)` | NOT NULL |
+
+### Primary Key:
+- `skill_id`
+
+### Foreign Keys:
+- None
+
+### Unique constraints:
+- `skill_name`
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- `skill_id` - Primary key index.
+- `skill_name` - Unique constraint index.
+
+### Relationships:
+- `skill` → `job`: Many-to-Many through `job_skill`
+
+
+## Education Requirement Table
+
+### TABLE NAME
+`education_requirement`
+
+### Purpose:
+Stores education requirements that can be associated with job postings.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `education_id` | `INT` | NOT NULL |
+| `education_name` | `VARCHAR(150)` | NOT NULL |
+
+### Primary Key:
+- `education_id`
+
+### Foreign Keys:
+- None
+
+### Unique constraints:
+- `education_name`
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- `education_id` - Primary key index.
+- `education_name` - Unique constraint index.
+
+### Relationships:
+- `education_requirement` → `job`: Many-to-Many through `job_education`
+
+
+## Source Table
+
+### TABLE NAME
+`source`
+
+### Purpose:
+Stores the sources from which job postings are obtained.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `source_id` | `INT` | NOT NULL |
+| `source_name` | `VARCHAR(50)` | NOT NULL |
+
+### Primary Key:
+- `source_id`
+
+### Foreign Keys:
+- None
+
+### Unique constraints:
+- `source_name`
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- `source_id` - Primary key index.
+- `source_name` - Unique constraint index.
+
+### Relationships:
+- `source` → `job`: Many-to-Many through `job_source`
+
+
+## Job Location Table
+
+### TABLE NAME
+`job_location`
+
+### Purpose:
+Associates job postings with their available locations.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `job_id` | `VARCHAR(100)` | NOT NULL |
+| `loc_id` | `INT` | NOT NULL |
+
+### Primary Key:
+- Composite primary key: (`job_id`, `loc_id`)
+
+### Foreign Keys:
+- `job_id` → `job.job_id`
+- `loc_id` → `location.loc_id`
+
+### Unique constraints:
+- Composite uniqueness: (`job_id`, `loc_id`)
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- Composite primary key index on (`job_id`, `loc_id`)
+- `loc_id` - Index for reverse lookups
+
+### Relationships:
+- `job` → `job_location`: One-to-Many
+- `location` → `job_location`: One-to-Many
+- `job` → `location`: Many-to-Many through `job_location`
+
+
+## Job Work Mode Table
+
+### TABLE NAME
+`job_work_mode`
+
+### Purpose:
+Associates job postings with their available work modes.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `job_id` | `VARCHAR(100)` | NOT NULL |
+| `work_mode_id` | `INT` | NOT NULL |
+
+### Primary Key:
+- Composite primary key: (`job_id`, `work_mode_id`)
+
+### Foreign Keys:
+- `job_id` → `job.job_id`
+- `work_mode_id` → `work_mode.work_mode_id`
+
+### Unique constraints:
+- Composite uniqueness: (`job_id`, `work_mode_id`)
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- Composite primary key index on (`job_id`, `work_mode_id`)
+- `work_mode_id` - Index for reverse lookups
+
+### Relationships:
+- `job` → `job_work_mode`: One-to-Many
+- `work_mode` → `job_work_mode`: One-to-Many
+- `job` → `work_mode`: Many-to-Many through `job_work_mode`
+
+
+## Job Skill Table
+
+### TABLE NAME
+`job_skill`
+
+### Purpose:
+Associates job postings with their required or preferred skills.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `job_id` | `VARCHAR(100)` | NOT NULL |
+| `skill_id` | `INT` | NOT NULL |
+| `skill_type` | `VARCHAR(20)` | NULL |
+
+### Primary Key:
+- Composite primary key: (`job_id`, `skill_id`)
+
+### Foreign Keys:
+- `job_id` → `job.job_id`
+- `skill_id` → `skill.skill_id`
+
+### Unique constraints:
+- Composite uniqueness: (`job_id`, `skill_id`)
+
+### Check constraints:
+- `skill_type IN ('required', 'preferred')`
+
+### Default values:
+- `skill_type` → `'required'`
+
+### Indexes:
+- Composite primary key index on (`job_id`, `skill_id`)
+- `skill_id` - Index for reverse lookups
+
+### Relationships:
+- `job` → `job_skill`: One-to-Many
+- `skill` → `job_skill`: One-to-Many
+- `job` → `skill`: Many-to-Many through `job_skill`
+
+
+## Job Education Table
+
+### TABLE NAME
+`job_education`
+
+### Purpose:
+Associates job postings with their education requirements.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `job_id` | `VARCHAR(100)` | NOT NULL |
+| `education_id` | `INT` | NOT NULL |
+| `ed_req_txt` | `TEXT` | NULL |
+
+### Primary Key:
+- Composite primary key: (`job_id`, `education_id`)
+
+### Foreign Keys:
+- `job_id` → `job.job_id`
+- `education_id` → `education_requirement.education_id`
+
+### Unique constraints:
+- Composite uniqueness: (`job_id`, `education_id`)
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- Composite primary key index on (`job_id`, `education_id`)
+- `education_id` - Index for reverse lookups
+
+### Relationships:
+- `job` → `job_education`: One-to-Many
+- `education_requirement` → `job_education`: One-to-Many
+- `job` → `education_requirement`: Many-to-Many through `job_education`
+
+
+## Job Source Table
+
+### TABLE NAME
+`job_source`
+
+### Purpose:
+Associates job postings with the sources from which they were obtained.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `job_id` | `VARCHAR(100)` | NOT NULL |
+| `source_id` | `INT` | NOT NULL |
+
+### Primary Key:
+- Composite primary key: (`job_id`, `source_id`)
+
+### Foreign Keys:
+- `job_id` → `job.job_id`
+- `source_id` → `source.source_id`
+
+### Unique constraints:
+- Composite uniqueness: (`job_id`, `source_id`)
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- Composite primary key index on (`job_id`, `source_id`)
+- `source_id` - Index for reverse lookups
+
+### Relationships:
+- `job` → `job_source`: One-to-Many
+- `source` → `job_source`: One-to-Many
+- `job` → `source`: Many-to-Many through `job_source`
+
+
+## Company Location Table
+
+### TABLE NAME
+`company_location`
+
+### Purpose:
+Associates companies with their available locations.
+
+### Columns:
+
+| Column | Data Type | Nullable |
+|---|---|---|
+| `company_id` | `VARCHAR(100)` | NOT NULL |
+| `loc_id` | `INT` | NOT NULL |
+
+### Primary Key:
+- Composite primary key: (`company_id`, `loc_id`)
+
+### Foreign Keys:
+- `company_id` → `company.company_id`
+- `loc_id` → `location.loc_id`
+
+### Unique constraints:
+- Composite uniqueness: (`company_id`, `loc_id`)
+
+### Check constraints:
+- None
+
+### Default values:
+- None
+
+### Indexes:
+- Composite primary key index on (`company_id`, `loc_id`)
+- `loc_id` - Index for reverse lookups
+
+### Relationships:
+- `company` → `company_location`: One-to-Many
+- `location` → `company_location`: One-to-Many
+- `company` → `location`: Many-to-Many through `company_location`
