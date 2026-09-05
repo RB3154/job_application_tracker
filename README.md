@@ -1,59 +1,148 @@
 # Job Application Tracker
 
-A personal Job Application Tracker being built with FastAPI and
-PostgreSQL. The project is developed incrementally while learning
-FastAPI concepts, with tutorial material progressively adapted into an
-application-specific architecture.
+A backend REST API for managing job applications, companies, and job postings.
 
-## Current Status
+This project is being built incrementally while learning and applying modern
+Python backend development concepts with FastAPI, Pydantic, SQLAlchemy,
+PostgreSQL, and Alembic.
 
-The database and model foundation is implemented and the initial schema
-migration has been applied successfully.
+The project started alongside Corey Schafer's FastAPI tutorial and has
+progressively been adapted into an application-specific backend with its own
+database schema, ORM models, validation rules, and CRUD API.
 
-### Implemented
+---
 
--   FastAPI application with a Job Application Tracker home route
--   Jinja2 template configuration and static-file mounting
--   HTML and JSON-oriented exception handling
--   PostgreSQL connection configuration loaded from `.env`
--   SQLAlchemy 2.x ORM models for the tracker schema
--   Core Pydantic schemas for `Company`, `Job`, and `Application`
--   Alembic configuration and an applied initial migration
--   PostgreSQL database with the 14-table application schema
+## Features
 
-The current application does **not** yet include CRUD operations, job
-API endpoints, routers, authentication, or a database-backed dashboard.
+### Company Management
 
-The `templates/` and `static/` directories are retained from the
-learning/reference implementation and will be tailored to the Job
-Application Tracker as development progresses.
+CRUD operations for companies:
+
+- Create a company
+- Retrieve all companies
+- Retrieve a company by ID
+- Replace a company using PUT
+- Partially update a company using PATCH
+- Delete a company
+
+### Job Management
+
+CRUD operations for job postings:
+
+- Create a job
+- Retrieve all jobs
+- Retrieve a job by ID
+- Replace a job using PUT
+- Partially update a job using PATCH
+- Delete a job
+
+Jobs include information such as:
+
+- Role
+- Job description
+- Job URL
+- Posting date
+- Application deadline
+- Minimum and maximum experience
+- Salary information
+- Company
+
+### Application Management
+
+CRUD operations for job applications:
+
+- Create an application
+- Retrieve all applications
+- Retrieve an application by ID
+- Replace an application using PUT
+- Partially update an application using PATCH
+- Delete an application
+
+Applications track:
+
+- Job
+- Date applied
+- Current application status
+
+Supported application statuses:
+
+Applied
+Screening
+Interview
+Rejected
+Offer
+Accepted
+Withdrawn
+
+
+---
 
 ## Technology Stack
 
--   Python 3.11+
--   FastAPI
--   Uvicorn
--   Jinja2
--   PostgreSQL
--   SQLAlchemy 2.x
--   psycopg
--   Pydantic
--   pydantic-settings
--   Alembic
--   uv
+| Technology        | Purpose                                   |
+| ----------------- | ----------------------------------------- |
+| Python 3.11+      | Programming language                      |
+| FastAPI           | REST API framework                        |
+| Uvicorn           | ASGI server                               |
+| Pydantic          | Request/response validation               |
+| SQLAlchemy 2.x    | ORM and database interaction              |
+| PostgreSQL        | Relational database                       |
+| psycopg           | PostgreSQL database driver                |
+| Alembic           | Database migrations                       |
+| pydantic-settings | Environment configuration                 |
+| uv                | Python package and environment management |
+
+---
+
+## Architecture
+
+The current backend follows this general flow:
+
+```text
+Client
+   |
+   v
+FastAPI
+   |
+   v
+Pydantic Schemas
+   |
+   v
+API Route
+   |
+   v
+SQLAlchemy ORM
+   |
+   v
+PostgreSQL
+```
+
+Database schema changes are managed separately through:
+
+```text
+SQLAlchemy Models
+       |
+       v
+     Alembic
+       |
+       v
+  PostgreSQL Schema
+```
+
+---
 
 ## Project Structure
 
-``` text
+```text
 job_application_tracker/
+│
 ├── alembic/
 │   ├── versions/
 │   │   └── 09f2cd3da047_initial_schema.py
 │   ├── env.py
 │   ├── README
 │   └── script.py.mako
-├── static/
-├── templates/
+│
 ├── .env
 ├── .gitignore
 ├── .python-version
@@ -70,45 +159,191 @@ job_application_tracker/
 └── uv.lock
 ```
 
-Local/generated files such as `.venv/`, `__pycache__/`, and `.vscode/`
-may exist in the workspace but are not source files intended for the
-repository.
+Local/generated files such as `.venv/`, `__pycache__/`, and `.vscode/` may
+exist locally but are not intended to be committed as application source code.
+
+---
 
 ## Application Entry Point
 
-Run:
+The FastAPI application is defined in:
 
-``` bash
+```text
+main.py
+```
+
+Run the application with:
+
+```bash
 uv sync
 uv run uvicorn main:app --reload
 ```
 
-Application: `http://127.0.0.1:8000`
+The application will be available at:
 
-FastAPI docs: `http://127.0.0.1:8000/docs`
-
-Current implemented route:
-
-``` text
-GET /
+```text
+http://127.0.0.1:8000
 ```
 
-`main.py` mounts static files at `/static` and configures Jinja2
-templates from `templates/`. The previous in-memory post/blog data and
-`/posts` / `/api/posts` routes are no longer part of the application.
+Interactive Swagger API documentation:
 
-## Database and ORM
+```text
+http://127.0.0.1:8000/docs
+```
 
-`database.py` loads `DATABASE_URL` from `.env` and configures a
-PostgreSQL SQLAlchemy engine using the psycopg driver. It also provides
-the declarative `Base`, session factory, and FastAPI-ready
-database-session dependency.
+OpenAPI documentation:
 
-`models.py` defines the SQLAlchemy 2.x ORM layer.
+```text
+http://127.0.0.1:8000/openapi.json
+```
 
-The current database schema contains these 14 application tables:
+---
 
-``` text
+## API Endpoints
+
+The API is organized around three primary resources.
+
+### Companies
+
+```text
+GET     /api/companies
+POST    /api/companies
+GET     /api/companies/{company_id}
+PUT     /api/companies/{company_id}
+PATCH   /api/companies/{company_id}
+DELETE  /api/companies/{company_id}
+```
+
+### Jobs
+
+```text
+GET     /api/jobs
+POST    /api/jobs
+GET     /api/jobs/{job_id}
+PUT     /api/jobs/{job_id}
+PATCH   /api/jobs/{job_id}
+DELETE  /api/jobs/{job_id}
+```
+
+### Applications
+
+```text
+GET     /api/applications
+POST    /api/applications
+GET     /api/applications/{application_id}
+PUT     /api/applications/{application_id}
+PATCH   /api/applications/{application_id}
+DELETE  /api/applications/{application_id}
+```
+
+---
+
+## PUT vs PATCH
+
+The API distinguishes between full replacement and partial updates.
+
+### PUT
+
+PUT performs a full replacement of the updateable fields.
+
+Example:
+
+```text
+PUT /api/companies/COMP1
+```
+
+The complete update payload is expected.
+
+### PATCH
+
+PATCH performs a partial update.
+
+Only fields included in the request are changed.
+
+For example:
+
+```text
+PATCH /api/companies/COMP1
+```
+
+with:
+
+```json
+{
+    "company_name": "Google India"
+}
+```
+
+changes only the company name.
+
+The implementation uses:
+
+```python
+model_dump(exclude_unset=True)
+```
+
+for PATCH requests so omitted fields are not overwritten.
+
+---
+
+## Database
+
+The application uses PostgreSQL as its database.
+
+The database connection is configured through the environment:
+
+```text
+DATABASE_URL
+```
+
+The value is loaded from `.env` using `pydantic-settings`.
+
+The SQLAlchemy database configuration is located in:
+
+```text
+database.py
+```
+
+The database layer provides:
+
+* PostgreSQL engine
+* SQLAlchemy session factory
+* Declarative ORM base
+* FastAPI database-session dependency
+
+The PostgreSQL driver used by SQLAlchemy is:
+
+```text
+psycopg
+```
+
+---
+
+## SQLAlchemy ORM
+
+The ORM models are defined in:
+
+```text
+models.py
+```
+
+The project uses SQLAlchemy 2.x style declarations including:
+
+```python
+Mapped
+mapped_column
+relationship
+```
+
+The ORM layer represents the application's relational database design.
+
+---
+
+## Database Schema
+
+The database currently contains 14 tables:
+
+```text
 application
 company
 company_location
@@ -125,110 +360,530 @@ source
 work_mode
 ```
 
-`FINAL_SCHEMA.md` is the authoritative specification for these tables,
-including columns, relationships, constraints, defaults, and indexes.
+The main entities are:
 
-## PostgreSQL Database Creation
-
-`create_db.sql` contains the SQL used to create the PostgreSQL database:
-
-``` sql
-CREATE DATABASE job_application_tracker;
+```text
+Company
+   |
+   | 1-to-many
+   v
+ Job
+   |
+   | 1-to-zero-or-one
+   v
+Application
 ```
 
-The application schema is managed through SQLAlchemy models and Alembic
-migrations.
+Jobs also have many-to-many relationships with:
+
+* Locations
+* Work modes
+* Skills
+* Education requirements
+* Sources
+
+Companies have a many-to-many relationship with locations.
+
+The many-to-many relationships are represented using explicit junction
+tables.
+
+---
+
+## Database Constraints
+
+The database schema contains relational constraints such as:
+
+* Primary keys
+* Foreign keys
+* Unique constraints
+* Composite primary keys
+* Check constraints
+* NOT NULL constraints
+* Default values
+* Indexes
+
+Examples include:
+
+### Job constraints
+
+```text
+application_deadline >= job_posting_date
+exp_min >= 0
+exp_max >= 0
+exp_max >= exp_min
+salary_min >= 0
+salary_max >= 0
+salary_max >= salary_min
+```
+
+`job_url` is unique.
+
+### Application constraints
+
+Each job can have at most one application.
+
+Application status is restricted to:
+
+```text
+Applied
+Screening
+Interview
+Rejected
+Offer
+Accepted
+Withdrawn
+```
+
+Foreign-key relationships are also validated before creating or updating
+dependent records.
+
+---
 
 ## Pydantic Schemas
 
-`schemas.py` currently contains:
+Request and response schemas are defined in:
 
--   `CompanyBase`, `CompanyCreate`, `CompanyResponse`
--   `JobBase`, `JobCreate`, `JobResponse`
--   `ApplicationBase`, `ApplicationCreate`, `ApplicationResponse`
-
-Response schemas use `from_attributes=True` so they can later be
-populated from SQLAlchemy model instances.
-
-These schemas are defined but are not yet connected to CRUD operations
-or database-backed API endpoints.
-
-## Alembic Migrations
-
-The initial migration has been applied to the configured PostgreSQL
-database:
-
-``` text
-Revision: 09f2cd3da047
-Message: initial schema
-Status: head
+```text
+schemas.py
 ```
 
-Commands:
+Current schemas include:
 
-``` bash
+### Company
+
+```text
+CompanyBase
+CompanyCreate
+CompanyResponse
+CompanyUpdate
+```
+
+### Job
+
+```text
+JobBase
+JobCreate
+JobResponse
+JobUpdate
+```
+
+### Application
+
+```text
+ApplicationBase
+ApplicationCreate
+ApplicationResponse
+ApplicationReplace
+ApplicationUpdate
+```
+
+Pydantic is responsible for validating API input before it reaches the
+database.
+
+For example, job schemas validate:
+
+* Required fields
+* String lengths
+* Non-negative experience values
+* Non-negative salary values
+* Valid date ranges
+* Valid salary ranges
+* Valid experience ranges
+* Valid application statuses
+
+---
+
+## Pydantic and SQLAlchemy Integration
+
+Response schemas use:
+
+```python
+model_config = ConfigDict(from_attributes=True)
+```
+
+This allows Pydantic response models to be created from SQLAlchemy ORM
+objects.
+
+The general flow is:
+
+```text
+PostgreSQL
+    |
+    v
+SQLAlchemy ORM object
+    |
+    v
+Pydantic Response Schema
+    |
+    v
+JSON response
+```
+
+---
+
+## API Error Handling
+
+The API handles common error conditions including:
+
+* Resource not found
+* Duplicate IDs
+* Duplicate job URLs
+* Duplicate applications for the same job
+* Invalid foreign-key references
+* Database constraint conflicts
+* Invalid request data
+
+HTTP status codes are used to communicate errors.
+
+Examples:
+
+```text
+201 Created
+204 No Content
+404 Not Found
+409 Conflict
+422 Unprocessable Content
+```
+
+Database `IntegrityError` exceptions are handled and converted into
+appropriate API conflict responses.
+
+---
+
+## Alembic
+
+Alembic is used for database schema migrations.
+
+The initial migration is:
+
+```text
+Revision: 09f2cd3da047
+Message: initial schema
+```
+
+Apply migrations with:
+
+```bash
 uv run alembic upgrade head
+```
+
+Check the current migration:
+
+```bash
 uv run alembic current
 ```
 
-Database schema changes should be managed through reviewed Alembic
-migrations rather than `Base.metadata.create_all()`.
+Create a new migration after making approved model changes:
 
-## Supporting Files
+```bash
+uv run alembic revision --autogenerate -m "description"
+```
 
--   `.env` - Local PostgreSQL configuration; do not commit secrets.
--   `.gitignore` - Excludes local/generated files and environment
-    secrets from Git.
--   `.python-version` - Specifies the project's Python version.
--   `alembic.ini` - Alembic configuration.
--   `CODING_INSTRUCTIONS.md` - Project implementation guidance.
--   `create_db.sql` - PostgreSQL database creation script.
--   `FINAL_SCHEMA.md` - Authoritative database schema specification.
--   `pyproject.toml` - Project configuration and dependencies.
--   `uv.lock` - Locked dependency versions.
+Generated migrations should always be reviewed before applying them.
 
-## Planned Next Steps
+Database schema changes should be managed through Alembic rather than using:
 
-The following are planned and are not implemented yet:
+```python
+Base.metadata.create_all()
+```
 
--   CRUD operations for jobs, companies, and applications
--   Database-backed API endpoints
--   FastAPI route organization with routers
--   Connecting templates to persisted data
--   Search and filtering
--   Application-status workflows
--   Authentication and authorization
--   Dashboard statistics
--   Additional ATS-style features
+---
+
+## Database Creation
+
+The PostgreSQL database creation script is provided in:
+
+```text
+create_db.sql
+```
+
+It contains the SQL required to create the application database.
+
+The database schema itself is managed through SQLAlchemy models and Alembic
+migrations.
+
+---
+
+## Configuration
+
+Create a `.env` file containing the PostgreSQL connection URL.
+
+Example:
+
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/job_application_tracker
+```
+
+Do not commit `.env` or database credentials to GitHub.
+
+---
+
+## Running the Project
+
+### 1. Install dependencies
+
+```bash
+uv sync
+```
+
+### 2. Configure PostgreSQL
+
+Create the PostgreSQL database and configure:
+
+```text
+DATABASE_URL
+```
+
+inside `.env`.
+
+### 3. Apply migrations
+
+```bash
+uv run alembic upgrade head
+```
+
+### 4. Start FastAPI
+
+```bash
+uv run uvicorn main:app --reload
+```
+
+### 5. Open Swagger
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+---
+
+## Current CRUD Implementation
+
+The current API implements CRUD for the three primary entities:
+
+```text
+Company
+   ├── Create
+   ├── Read
+   ├── Update
+   └── Delete
+
+Job
+   ├── Create
+   ├── Read
+   ├── Update
+   └── Delete
+
+Application
+   ├── Create
+   ├── Read
+   ├── Update
+   └── Delete
+```
+
+Both full replacement and partial update operations are supported.
+
+The implementation also respects the existing relational constraints instead
+of bypassing them through application shortcuts.
+
+---
 
 ## Development Approach
 
-The project is being built alongside Corey Schafer's FastAPI tutorial
-rather than attempting to implement the entire application at once.
+This project is being developed incrementally.
 
-``` text
-FastAPI Tutorial Concept
+The learning and implementation process follows:
+
+```text
+Learn FastAPI concept
         ↓
 Understand the concept
         ↓
-Adapt it to Job Application Tracker
+Adapt it to the Job Application Tracker
         ↓
-Implement it in the project
+Implement it using the project's schema
+        ↓
+Test the implementation
         ↓
 Move to the next concept
 ```
 
-The goal is to learn each FastAPI concept and immediately apply it to
-the Job Application Tracker.
+The goal is not simply to reproduce a tutorial application.
+
+The goal is to understand the underlying backend concepts and apply them to
+an application with its own database design and requirements.
+
+---
 
 ## Learning Reference
 
-Corey Schafer's FastAPI tutorial series is the learning reference for
-this project. Existing `templates/` and `static/` assets, along with
-parts of the initial FastAPI structure, originated from or were adapted
-while following the tutorial.
+The initial FastAPI learning structure and CRUD concepts were learned while
+following **Corey Schafer's FastAPI tutorial**.
 
-The project is progressively being reshaped into an independent Job
-Application Tracker with its own PostgreSQL schema, SQLAlchemy ORM
-models, Pydantic schemas, Alembic migrations, and planned application
-features.
+Corey Schafer's tutorial served as the learning reference for understanding
+core FastAPI concepts and CRUD patterns.
+
+The implementation in this repository has subsequently been adapted into the
+Job Application Tracker's own architecture.
+
+The project now uses its own:
+
+* PostgreSQL database
+* Relational schema
+* SQLAlchemy ORM models
+* Pydantic schemas
+* Alembic migrations
+* API routes
+* Validation rules
+* Database constraints
+
+Corey Schafer:
+
+[https://www.youtube.com/@coreyms](https://www.youtube.com/@coreyms)
+
+FastAPI tutorial playlist:
+
+[https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH](https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH)
+
+> Note: The tutorial is credited as the learning reference. This repository
+> is being progressively adapted into an application-specific backend rather
+> than remaining a direct copy of the tutorial project.
+
+---
+
+## Project Documentation
+
+### `FINAL_SCHEMA.md`
+
+The authoritative specification for the database schema.
+
+It defines:
+
+* Tables
+* Columns
+* Data types
+* Nullability
+* Primary keys
+* Foreign keys
+* Unique constraints
+* Check constraints
+* Defaults
+* Indexes
+* Relationships
+
+### `CODING_INSTRUCTIONS.md`
+
+Contains project-specific development and implementation rules.
+
+### `create_db.sql`
+
+Contains the PostgreSQL database creation SQL.
+
+### `database.py`
+
+Contains PostgreSQL and SQLAlchemy database configuration.
+
+### `models.py`
+
+Contains SQLAlchemy ORM models.
+
+### `schemas.py`
+
+Contains Pydantic request and response schemas.
+
+### `main.py`
+
+Contains the FastAPI application and current CRUD API endpoints.
+
+---
+
+## Current Limitations
+
+The current implementation focuses on the backend CRUD foundation.
+
+The following features are not implemented yet:
+
+* Authentication
+* Authorization
+* Dashboard
+* Search and filtering
+* Advanced application workflows
+* Background jobs
+* Caching
+* Notifications
+* Deployment configuration
+* Frontend UI
+
+These features can be added incrementally after the backend foundation is
+expanded.
+
+---
+
+## Roadmap
+
+Planned development direction:
+
+```text
+Current
+  ↓
+CRUD foundation
+  ↓
+API organization with routers
+  ↓
+Reference-table CRUD
+  ↓
+Junction-table operations
+  ↓
+Search and filtering
+  ↓
+Application workflows
+  ↓
+Authentication & authorization
+  ↓
+Dashboard / analytics
+  ↓
+Production backend improvements
+  ↓
+Deployment
+```
+
+The exact implementation order may evolve as the project develops.
+
+---
+
+## Project Goal
+
+The long-term goal is to turn this into a practical Job Application Tracker
+while using the project as a hands-on backend engineering learning platform.
+
+The project is intended to provide practical experience with:
+
+* REST API design
+* FastAPI
+* Pydantic validation
+* SQLAlchemy ORM
+* PostgreSQL
+* Relational database design
+* Foreign keys and constraints
+* Database migrations
+* CRUD operations
+* Error handling
+* API documentation
+* Backend architecture
+* Production-oriented development practices
+
+---
+
+## License
+
+This project is currently a personal learning and development project.
+
+
+
+### One important thing I changed 🧹
+
+I **didn't carry over the old claims about Jinja2, `templates/`, `static/`, or the home route**, because those belong to the old tutorial-derived frontend setup, not the backend direction you're taking now.
+
+I also deliberately credited **Corey Schafer as the learning reference**, rather than making the README sound like the entire project is his code. That's a much better representation of what you're actually doing: **learn the concept from Corey → understand it → adapt it to your own JAT architecture.** 🚀
+
+One thing to double-check before committing: your `pyproject.toml` still lists `jinja2` and `python-multipart`. Since you've now removed the template/static layer, those may be leftover dependencies and are worth cleaning up separately rather than pretending they're part of the current backend stack.
+
