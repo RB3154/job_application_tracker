@@ -4,11 +4,11 @@ A backend REST API for managing job applications, companies, and job postings.
 
 This project is being built incrementally while learning and applying modern
 Python backend development concepts with FastAPI, Pydantic, SQLAlchemy,
-PostgreSQL, and Alembic.
+PostgreSQL, async programming, and Alembic.
 
 The project started alongside Corey Schafer's FastAPI tutorial and has
 progressively been adapted into an application-specific backend with its own
-database schema, ORM models, validation rules, and CRUD API.
+database schema, ORM models, validation rules, constraints, and CRUD API.
 
 ---
 
@@ -24,6 +24,8 @@ CRUD operations for companies:
 - Replace a company using PUT
 - Partially update a company using PATCH
 - Delete a company
+
+---
 
 ### Job Management
 
@@ -47,6 +49,8 @@ Jobs include information such as:
 - Salary information
 - Company
 
+---
+
 ### Application Management
 
 CRUD operations for job applications:
@@ -66,6 +70,7 @@ Applications track:
 
 Supported application statuses:
 
+```text
 Applied
 Screening
 Interview
@@ -73,24 +78,109 @@ Rejected
 Offer
 Accepted
 Withdrawn
-
+```
 
 ---
 
 ## Technology Stack
 
-| Technology        | Purpose                                   |
-| ----------------- | ----------------------------------------- |
-| Python 3.11+      | Programming language                      |
-| FastAPI           | REST API framework                        |
-| Uvicorn           | ASGI server                               |
-| Pydantic          | Request/response validation               |
-| SQLAlchemy 2.x    | ORM and database interaction              |
-| PostgreSQL        | Relational database                       |
-| psycopg           | PostgreSQL database driver                |
-| Alembic           | Database migrations                       |
-| pydantic-settings | Environment configuration                 |
-| uv                | Python package and environment management |
+| Technology | Purpose |
+| --- | --- |
+| Python 3.11+ | Programming language |
+| FastAPI | REST API framework |
+| Uvicorn | ASGI server |
+| Pydantic | Request/response validation |
+| SQLAlchemy 2.x | ORM and database interaction |
+| PostgreSQL | Relational database |
+| asyncpg | Asynchronous PostgreSQL database driver |
+| Alembic | Database migrations |
+| pydantic-settings | Environment configuration |
+| uv | Python package and environment management |
+
+---
+
+## Async Architecture
+
+The backend uses SQLAlchemy's asynchronous APIs for PostgreSQL database
+operations.
+
+The main async components are:
+
+- `create_async_engine`
+- `AsyncSession`
+- `async_sessionmaker`
+- `asyncpg`
+- Async FastAPI route handlers
+- Async database dependencies
+- Async FastAPI lifespan
+- Async database operations
+
+The general request flow is:
+
+```text
+Client
+   |
+   v
+FastAPI
+   |
+   v
+Async Route Handler
+   |
+   v
+AsyncSession
+   |
+   v
+SQLAlchemy Async ORM
+   |
+   v
+asyncpg
+   |
+   v
+PostgreSQL
+```
+
+### Synchronous → Asynchronous Conversion
+
+The database layer uses the following async equivalents:
+
+```text
+Session
+   ↓
+AsyncSession
+
+create_engine()
+   ↓
+create_async_engine()
+
+sessionmaker()
+   ↓
+async_sessionmaker()
+
+PostgreSQL synchronous driver
+   ↓
+asyncpg
+```
+
+Database operations that require asynchronous execution are awaited:
+
+```python
+await db.get(...)
+await db.execute(...)
+await db.commit()
+await db.rollback()
+await db.refresh(...)
+await db.delete(...)
+```
+
+Operations that are synchronous remain synchronous.
+
+For example:
+
+```python
+db.add(instance)
+```
+
+does not require `await`.
 
 ---
 
@@ -108,26 +198,32 @@ FastAPI
 Pydantic Schemas
    |
    v
-API Route
+Async API Route
    |
    v
-SQLAlchemy ORM
+Async SQLAlchemy ORM
+   |
+   v
+asyncpg
    |
    v
 PostgreSQL
 ```
 
-Database schema changes are managed separately through:
+Database schema changes are managed through Alembic:
 
 ```text
 SQLAlchemy Models
        |
        v
-     Alembic
+    Alembic
        |
        v
-  PostgreSQL Schema
+PostgreSQL Schema
 ```
+
+The FastAPI application also initializes the SQLAlchemy metadata during
+application startup using the async engine.
 
 ---
 
@@ -172,10 +268,13 @@ The FastAPI application is defined in:
 main.py
 ```
 
-Run the application with:
+The application uses a FastAPI lifespan function to initialize the database
+schema when the application starts and dispose of the async database engine
+when the application shuts down.
+
+Start the application with:
 
 ```bash
-uv sync
 uv run uvicorn main:app --reload
 ```
 
@@ -185,13 +284,25 @@ The application will be available at:
 http://127.0.0.1:8000
 ```
 
-Interactive Swagger API documentation:
+---
+
+## API Documentation
+
+FastAPI automatically provides interactive API documentation.
+
+### Swagger UI
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-OpenAPI documentation:
+### ReDoc
+
+```text
+http://127.0.0.1:8000/redoc
+```
+
+### OpenAPI Schema
 
 ```text
 http://127.0.0.1:8000/openapi.json
@@ -260,7 +371,7 @@ PATCH performs a partial update.
 
 Only fields included in the request are changed.
 
-For example:
+Example:
 
 ```text
 PATCH /api/companies/COMP1
@@ -274,7 +385,7 @@ with:
 }
 ```
 
-changes only the company name.
+Only the company name is changed.
 
 The implementation uses:
 
@@ -288,9 +399,9 @@ for PATCH requests so omitted fields are not overwritten.
 
 ## Database
 
-The application uses PostgreSQL as its database.
+The application uses PostgreSQL as its relational database.
 
-The database connection is configured through the environment:
+The database connection is configured through:
 
 ```text
 DATABASE_URL
@@ -306,16 +417,95 @@ database.py
 
 The database layer provides:
 
-* PostgreSQL engine
-* SQLAlchemy session factory
-* Declarative ORM base
-* FastAPI database-session dependency
+- Async PostgreSQL engine
+- SQLAlchemy `AsyncSession`
+- Async session factory
+- Declarative ORM base
+- Async FastAPI database-session dependency
 
 The PostgreSQL driver used by SQLAlchemy is:
 
 ```text
-psycopg
+asyncpg
 ```
+
+The SQLAlchemy connection URL is normalized to use:
+
+```text
+postgresql+asyncpg
+```
+
+for asynchronous PostgreSQL operations.
+
+---
+
+## Async Database Sessions
+
+The application creates database sessions using SQLAlchemy's
+`async_sessionmaker`.
+
+The FastAPI database dependency provides an `AsyncSession` to API routes.
+
+Conceptually:
+
+```text
+Incoming API request
+        |
+        v
+    get_db()
+        |
+        v
+   AsyncSession
+        |
+        v
+   API route
+        |
+        v
+Database operations
+        |
+        v
+Session closed
+```
+
+The async session is managed using an asynchronous context manager so that
+the session lifecycle is handled automatically.
+
+---
+
+## FastAPI Lifespan
+
+The application uses FastAPI's lifespan mechanism for startup and shutdown
+operations.
+
+During startup:
+
+```text
+FastAPI starts
+      |
+      v
+Async database connection
+      |
+      v
+Create SQLAlchemy metadata
+```
+
+During shutdown:
+
+```text
+FastAPI shuts down
+      |
+      v
+Dispose async SQLAlchemy engine
+```
+
+The database initialization uses:
+
+```python
+async with engine.begin() as conn:
+    await conn.run_sync(Base.metadata.create_all)
+```
+
+The async engine is disposed during shutdown.
 
 ---
 
@@ -376,16 +566,15 @@ Application
 
 Jobs also have many-to-many relationships with:
 
-* Locations
-* Work modes
-* Skills
-* Education requirements
-* Sources
+- Locations
+- Work modes
+- Skills
+- Education requirements
+- Sources
 
 Companies have a many-to-many relationship with locations.
 
-The many-to-many relationships are represented using explicit junction
-tables.
+The many-to-many relationships are represented using explicit junction tables.
 
 ---
 
@@ -393,14 +582,14 @@ tables.
 
 The database schema contains relational constraints such as:
 
-* Primary keys
-* Foreign keys
-* Unique constraints
-* Composite primary keys
-* Check constraints
-* NOT NULL constraints
-* Default values
-* Indexes
+- Primary keys
+- Foreign keys
+- Unique constraints
+- Composite primary keys
+- Check constraints
+- NOT NULL constraints
+- Default values
+- Indexes
 
 Examples include:
 
@@ -480,16 +669,16 @@ ApplicationUpdate
 Pydantic is responsible for validating API input before it reaches the
 database.
 
-For example, job schemas validate:
+Examples of validation include:
 
-* Required fields
-* String lengths
-* Non-negative experience values
-* Non-negative salary values
-* Valid date ranges
-* Valid salary ranges
-* Valid experience ranges
-* Valid application statuses
+- Required fields
+- String lengths
+- Non-negative experience values
+- Non-negative salary values
+- Valid date ranges
+- Valid salary ranges
+- Valid experience ranges
+- Valid application statuses
 
 ---
 
@@ -525,13 +714,13 @@ JSON response
 
 The API handles common error conditions including:
 
-* Resource not found
-* Duplicate IDs
-* Duplicate job URLs
-* Duplicate applications for the same job
-* Invalid foreign-key references
-* Database constraint conflicts
-* Invalid request data
+- Resource not found
+- Duplicate IDs
+- Duplicate job URLs
+- Duplicate applications for the same job
+- Invalid foreign-key references
+- Database constraint conflicts
+- Invalid request data
 
 HTTP status codes are used to communicate errors.
 
@@ -548,6 +737,14 @@ Examples:
 Database `IntegrityError` exceptions are handled and converted into
 appropriate API conflict responses.
 
+For example, database constraint conflicts can result in:
+
+```text
+409 Conflict
+```
+
+instead of exposing raw database errors to the API client.
+
 ---
 
 ## Alembic
@@ -561,31 +758,30 @@ Revision: 09f2cd3da047
 Message: initial schema
 ```
 
-Apply migrations with:
+The Alembic environment has been configured to work with the project's
+asynchronous SQLAlchemy engine while using Alembic's migration API.
+
+### Apply migrations
 
 ```bash
 uv run alembic upgrade head
 ```
 
-Check the current migration:
+### Check the current migration
 
 ```bash
 uv run alembic current
 ```
 
-Create a new migration after making approved model changes:
+### Create a new migration
+
+After making approved SQLAlchemy model changes:
 
 ```bash
 uv run alembic revision --autogenerate -m "description"
 ```
 
 Generated migrations should always be reviewed before applying them.
-
-Database schema changes should be managed through Alembic rather than using:
-
-```python
-Base.metadata.create_all()
-```
 
 ---
 
@@ -599,8 +795,8 @@ create_db.sql
 
 It contains the SQL required to create the application database.
 
-The database schema itself is managed through SQLAlchemy models and Alembic
-migrations.
+The database schema itself is represented through the SQLAlchemy models and
+managed through Alembic migrations.
 
 ---
 
@@ -614,11 +810,20 @@ Example:
 DATABASE_URL=postgresql://username:password@localhost:5432/job_application_tracker
 ```
 
+The application converts the PostgreSQL URL to the asynchronous SQLAlchemy
+driver format internally:
+
+```text
+postgresql+asyncpg
+```
+
 Do not commit `.env` or database credentials to GitHub.
 
 ---
 
-## Running the Project
+## Installation
+
+This project uses `uv` for Python environment and dependency management.
 
 ### 1. Install dependencies
 
@@ -682,8 +887,8 @@ Application
 
 Both full replacement and partial update operations are supported.
 
-The implementation also respects the existing relational constraints instead
-of bypassing them through application shortcuts.
+The implementation also respects the existing relational constraints rather
+than bypassing them through application shortcuts.
 
 ---
 
@@ -694,17 +899,17 @@ This project is being developed incrementally.
 The learning and implementation process follows:
 
 ```text
-Learn FastAPI concept
+Learn FastAPI / Backend Concept
         ↓
-Understand the concept
+Understand the Concept
         ↓
-Adapt it to the Job Application Tracker
+Adapt It to the Job Application Tracker
         ↓
-Implement it using the project's schema
+Implement It Using the Project's Schema
         ↓
-Test the implementation
+Test the Implementation
         ↓
-Move to the next concept
+Move to the Next Concept
 ```
 
 The goal is not simply to reproduce a tutorial application.
@@ -727,22 +932,23 @@ Job Application Tracker's own architecture.
 
 The project now uses its own:
 
-* PostgreSQL database
-* Relational schema
-* SQLAlchemy ORM models
-* Pydantic schemas
-* Alembic migrations
-* API routes
-* Validation rules
-* Database constraints
+- PostgreSQL database
+- Relational schema
+- SQLAlchemy ORM models
+- Pydantic schemas
+- Alembic migrations
+- Async database layer
+- API routes
+- Validation rules
+- Database constraints
 
 Corey Schafer:
 
-[https://www.youtube.com/@coreyms](https://www.youtube.com/@coreyms)
+https://www.youtube.com/@coreyms
 
 FastAPI tutorial playlist:
 
-[https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH](https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH)
+https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH
 
 > Note: The tutorial is credited as the learning reference. This repository
 > is being progressively adapted into an application-specific backend rather
@@ -758,17 +964,17 @@ The authoritative specification for the database schema.
 
 It defines:
 
-* Tables
-* Columns
-* Data types
-* Nullability
-* Primary keys
-* Foreign keys
-* Unique constraints
-* Check constraints
-* Defaults
-* Indexes
-* Relationships
+- Tables
+- Columns
+- Data types
+- Nullability
+- Primary keys
+- Foreign keys
+- Unique constraints
+- Check constraints
+- Defaults
+- Indexes
+- Relationships
 
 ### `CODING_INSTRUCTIONS.md`
 
@@ -780,7 +986,7 @@ Contains the PostgreSQL database creation SQL.
 
 ### `database.py`
 
-Contains PostgreSQL and SQLAlchemy database configuration.
+Contains the asynchronous PostgreSQL and SQLAlchemy database configuration.
 
 ### `models.py`
 
@@ -792,7 +998,12 @@ Contains Pydantic request and response schemas.
 
 ### `main.py`
 
-Contains the FastAPI application and current CRUD API endpoints.
+Contains the FastAPI application, async database operations, validation
+logic, error handling, and CRUD API endpoints.
+
+### `alembic/`
+
+Contains database migration configuration and migration revisions.
 
 ---
 
@@ -802,16 +1013,16 @@ The current implementation focuses on the backend CRUD foundation.
 
 The following features are not implemented yet:
 
-* Authentication
-* Authorization
-* Dashboard
-* Search and filtering
-* Advanced application workflows
-* Background jobs
-* Caching
-* Notifications
-* Deployment configuration
-* Frontend UI
+- Authentication
+- Authorization
+- Dashboard
+- Search and filtering
+- Advanced application workflows
+- Background jobs
+- Caching
+- Notifications
+- Deployment configuration
+- Frontend UI
 
 These features can be added incrementally after the backend foundation is
 expanded.
@@ -825,23 +1036,23 @@ Planned development direction:
 ```text
 Current
   ↓
-CRUD foundation
+Async CRUD Foundation
   ↓
-API organization with routers
+API Organization with Routers
   ↓
 Reference-table CRUD
   ↓
-Junction-table operations
+Junction-table Operations
   ↓
-Search and filtering
+Search and Filtering
   ↓
-Application workflows
+Application Workflows
   ↓
-Authentication & authorization
+Authentication & Authorization
   ↓
-Dashboard / analytics
+Dashboard / Analytics
   ↓
-Production backend improvements
+Production Backend Improvements
   ↓
 Deployment
 ```
@@ -857,33 +1068,25 @@ while using the project as a hands-on backend engineering learning platform.
 
 The project is intended to provide practical experience with:
 
-* REST API design
-* FastAPI
-* Pydantic validation
-* SQLAlchemy ORM
-* PostgreSQL
-* Relational database design
-* Foreign keys and constraints
-* Database migrations
-* CRUD operations
-* Error handling
-* API documentation
-* Backend architecture
-* Production-oriented development practices
+- REST API design
+- FastAPI
+- Async Python
+- Pydantic validation
+- SQLAlchemy ORM
+- Async SQLAlchemy
+- PostgreSQL
+- asyncpg
+- Relational database design
+- Foreign keys and constraints
+- Database migrations
+- CRUD operations
+- Error handling
+- API documentation
+- Backend architecture
+- Production-oriented development practices
 
 ---
 
 ## License
 
 This project is currently a personal learning and development project.
-
-
-
-### One important thing I changed 🧹
-
-I **didn't carry over the old claims about Jinja2, `templates/`, `static/`, or the home route**, because those belong to the old tutorial-derived frontend setup, not the backend direction you're taking now.
-
-I also deliberately credited **Corey Schafer as the learning reference**, rather than making the README sound like the entire project is his code. That's a much better representation of what you're actually doing: **learn the concept from Corey → understand it → adapt it to your own JAT architecture.** 🚀
-
-One thing to double-check before committing: your `pyproject.toml` still lists `jinja2` and `python-multipart`. Since you've now removed the template/static layer, those may be leftover dependencies and are worth cleaning up separately rather than pretending they're part of the current backend stack.
-

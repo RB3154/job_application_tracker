@@ -1,3 +1,4 @@
+import asyncio
 from logging.config import fileConfig
 
 from alembic import context
@@ -40,6 +41,22 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def do_run_migrations(connection) -> None:
+    """Configure and run migrations using Alembic's synchronous API."""
+
+    context.configure(connection=connection, target_metadata=target_metadata)
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    """Bridge Alembic's synchronous migration API through the async engine."""
+
+    async with engine.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -47,13 +64,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    with engine.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
+    asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():

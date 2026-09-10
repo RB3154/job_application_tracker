@@ -1,11 +1,11 @@
 """PostgreSQL database configuration for the application."""
 
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import create_engine
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
 
 class Settings(BaseSettings):
@@ -16,30 +16,32 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
-def _psycopg_database_url(database_url: str) -> URL:
-    """Return a PostgreSQL URL configured to use SQLAlchemy's psycopg driver."""
+def _async_postgresql_database_url(database_url: str) -> URL:
+    """Return a PostgreSQL URL configured for SQLAlchemy's asyncpg driver."""
 
     url = make_url(database_url)
-    if url.drivername not in {"postgresql", "postgres", "postgresql+psycopg"}:
+    if url.drivername not in {
+        "postgresql",
+        "postgres",
+        "postgresql+asyncpg",
+        "postgresql+psycopg",
+    }:
         raise ValueError("DATABASE_URL must use a PostgreSQL URL.")
 
-    return url.set(drivername="postgresql+psycopg")
+    return url.set(drivername="postgresql+asyncpg")
 
 
 settings = Settings()
-engine = create_engine(_psycopg_database_url(settings.database_url))
-SessionLocal = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
+engine = create_async_engine(_async_postgresql_database_url(settings.database_url))
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
     """Base class for the project's SQLAlchemy ORM models."""
 
 
-def get_db() -> Generator[Session, None, None]:
-    """Yield a database session for use as a FastAPI dependency."""
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Yield an async database session for use as a FastAPI dependency."""
 
-    db = SessionLocal()
-    try:
+    async with AsyncSessionLocal() as db:
         yield db
-    finally:
-        db.close()
