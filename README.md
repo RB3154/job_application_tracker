@@ -4,11 +4,12 @@ A backend REST API for managing job applications, companies, and job postings.
 
 This project is being built incrementally while learning and applying modern
 Python backend development concepts with FastAPI, Pydantic, SQLAlchemy,
-PostgreSQL, async programming, and Alembic.
+PostgreSQL, async programming, API routers, and Alembic.
 
 The project started alongside Corey Schafer's FastAPI tutorial and has
 progressively been adapted into an application-specific backend with its own
-database schema, ORM models, validation rules, constraints, and CRUD API.
+database schema, ORM models, validation rules, constraints, async database
+layer, and CRUD API.
 
 ---
 
@@ -99,6 +100,156 @@ Withdrawn
 
 ---
 
+## Project Architecture
+
+The backend is organized around three primary API resources:
+
+```text
+Client
+   |
+   v
+FastAPI Application
+   |
+   +-------------------+
+   |                   |
+   v                   v
+Routers             Exception Handlers
+   |
+   +-------------------+
+   |         |         |
+   v         v         v
+Companies  Jobs  Applications
+   |         |         |
+   +---------+---------+
+             |
+             v
+      Async Database Layer
+             |
+             v
+       SQLAlchemy ORM
+             |
+             v
+           asyncpg
+             |
+             v
+        PostgreSQL
+```
+
+The FastAPI application uses `APIRouter` to organize API endpoints into
+resource-specific modules.
+
+The current router structure is:
+
+```text
+routers/
+├── __init__.py
+├── helpers.py
+├── companies.py
+├── jobs.py
+└── applications.py
+```
+
+Each resource router contains the API endpoints associated with that resource.
+
+Shared database and validation helpers are kept in `routers/helpers.py`.
+
+---
+
+## API Router Architecture
+
+The API routes are separated from the main FastAPI application using
+FastAPI's `APIRouter`.
+
+### Company Router
+
+```text
+routers/companies.py
+```
+
+Contains all company CRUD endpoints.
+
+### Job Router
+
+```text
+routers/jobs.py
+```
+
+Contains all job CRUD endpoints.
+
+### Application Router
+
+```text
+routers/applications.py
+```
+
+Contains all application CRUD endpoints.
+
+### Shared Router Helpers
+
+```text
+routers/helpers.py
+```
+
+Contains shared asynchronous database and validation helpers used by the
+resource routers.
+
+Examples include:
+
+- Resource lookup helpers
+- Database conflict handling
+- Job URL uniqueness validation
+- Application-per-job validation
+
+The routers are connected to the FastAPI application through
+`app.include_router()`.
+
+The API prefixes are:
+
+```text
+/api/companies
+/api/jobs
+/api/applications
+```
+
+Router tags are also used to organize the endpoints in FastAPI's interactive
+API documentation.
+
+---
+
+## API Request Flow
+
+A typical API request follows this flow:
+
+```text
+Client
+   |
+   v
+FastAPI Application
+   |
+   v
+APIRouter
+   |
+   v
+Route Handler
+   |
+   v
+Pydantic Validation
+   |
+   v
+AsyncSession
+   |
+   v
+SQLAlchemy Async ORM
+   |
+   v
+asyncpg
+   |
+   v
+PostgreSQL
+```
+
+---
+
 ## Async Architecture
 
 The backend uses SQLAlchemy's asynchronous APIs for PostgreSQL database
@@ -115,7 +266,7 @@ The main async components are:
 - Async FastAPI lifespan
 - Async database operations
 
-The general request flow is:
+The general database flow is:
 
 ```text
 Client
@@ -184,82 +335,6 @@ does not require `await`.
 
 ---
 
-## Architecture
-
-The current backend follows this general flow:
-
-```text
-Client
-   |
-   v
-FastAPI
-   |
-   v
-Pydantic Schemas
-   |
-   v
-Async API Route
-   |
-   v
-Async SQLAlchemy ORM
-   |
-   v
-asyncpg
-   |
-   v
-PostgreSQL
-```
-
-Database schema changes are managed through Alembic:
-
-```text
-SQLAlchemy Models
-       |
-       v
-    Alembic
-       |
-       v
-PostgreSQL Schema
-```
-
-The FastAPI application also initializes the SQLAlchemy metadata during
-application startup using the async engine.
-
----
-
-## Project Structure
-
-```text
-job_application_tracker/
-│
-├── alembic/
-│   ├── versions/
-│   │   └── 09f2cd3da047_initial_schema.py
-│   ├── env.py
-│   ├── README
-│   └── script.py.mako
-│
-├── .env
-├── .gitignore
-├── .python-version
-├── alembic.ini
-├── CODING_INSTRUCTIONS.md
-├── create_db.sql
-├── database.py
-├── FINAL_SCHEMA.md
-├── main.py
-├── models.py
-├── pyproject.toml
-├── README.md
-├── schemas.py
-└── uv.lock
-```
-
-Local/generated files such as `.venv/`, `__pycache__/`, and `.vscode/` may
-exist locally but are not intended to be committed as application source code.
-
----
-
 ## Application Entry Point
 
 The FastAPI application is defined in:
@@ -268,21 +343,57 @@ The FastAPI application is defined in:
 main.py
 ```
 
-The application uses a FastAPI lifespan function to initialize the database
-schema when the application starts and dispose of the async database engine
-when the application shuts down.
+`main.py` is responsible for application-level configuration and wiring.
 
-Start the application with:
+It currently contains:
 
-```bash
-uv run uvicorn main:app --reload
+- FastAPI application creation
+- Async lifespan configuration
+- Router imports
+- Router registration
+- Exception handlers
+
+The resource-specific API route implementations are kept inside the
+corresponding router modules.
+
+The application includes the routers using:
+
+```python
+app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
+app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
+app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
 ```
 
-The application will be available at:
+This keeps the public API URLs unchanged while separating the internal route
+organization.
+
+---
+
+## FastAPI Lifespan
+
+The application uses FastAPI's lifespan mechanism for startup and shutdown
+operations.
+
+During startup:
 
 ```text
-http://127.0.0.1:8000
+FastAPI starts
+      |
+      v
+Async database connection
+      |
+      v
+Create SQLAlchemy metadata
 ```
+
+The implementation uses:
+
+```python
+async with engine.begin() as conn:
+    await conn.run_sync(Base.metadata.create_all)
+```
+
+During shutdown, the async SQLAlchemy engine is disposed.
 
 ---
 
@@ -308,11 +419,14 @@ http://127.0.0.1:8000/redoc
 http://127.0.0.1:8000/openapi.json
 ```
 
+The API routers use tags so that related endpoints are grouped in the Swagger
+documentation.
+
 ---
 
 ## API Endpoints
 
-The API is organized around three primary resources.
+The API currently exposes 18 CRUD operations across three primary resources.
 
 ### Companies
 
@@ -346,6 +460,8 @@ PUT     /api/applications/{application_id}
 PATCH   /api/applications/{application_id}
 DELETE  /api/applications/{application_id}
 ```
+
+The router refactor preserves the existing public API paths and HTTP methods.
 
 ---
 
@@ -429,7 +545,7 @@ The PostgreSQL driver used by SQLAlchemy is:
 asyncpg
 ```
 
-The SQLAlchemy connection URL is normalized to use:
+The SQLAlchemy connection URL is normalized to:
 
 ```text
 postgresql+asyncpg
@@ -452,60 +568,23 @@ Conceptually:
 Incoming API request
         |
         v
-    get_db()
+     get_db()
         |
         v
-   AsyncSession
+    AsyncSession
         |
         v
-   API route
+     API route
         |
         v
 Database operations
         |
         v
-Session closed
+   Session closed
 ```
 
-The async session is managed using an asynchronous context manager so that
-the session lifecycle is handled automatically.
-
----
-
-## FastAPI Lifespan
-
-The application uses FastAPI's lifespan mechanism for startup and shutdown
-operations.
-
-During startup:
-
-```text
-FastAPI starts
-      |
-      v
-Async database connection
-      |
-      v
-Create SQLAlchemy metadata
-```
-
-During shutdown:
-
-```text
-FastAPI shuts down
-      |
-      v
-Dispose async SQLAlchemy engine
-```
-
-The database initialization uses:
-
-```python
-async with engine.begin() as conn:
-    await conn.run_sync(Base.metadata.create_all)
-```
-
-The async engine is disposed during shutdown.
+The async session is managed using an asynchronous context manager so that the
+session lifecycle is handled automatically.
 
 ---
 
@@ -745,6 +824,18 @@ For example, database constraint conflicts can result in:
 
 instead of exposing raw database errors to the API client.
 
+Application-level FastAPI exception handlers are defined in:
+
+```text
+main.py
+```
+
+Shared resource lookup and database conflict helpers are defined in:
+
+```text
+routers/helpers.py
+```
+
 ---
 
 ## Alembic
@@ -861,6 +952,48 @@ http://127.0.0.1:8000/docs
 
 ---
 
+## Project Structure
+
+The current project structure is approximately:
+
+```text
+job_application_tracker/
+│
+├── alembic/
+│   ├── versions/
+│   │   └── 09f2cd3da047_initial_schema.py
+│   ├── env.py
+│   ├── README
+│   └── script.py.mako
+│
+├── routers/
+│   ├── __init__.py
+│   ├── helpers.py
+│   ├── companies.py
+│   ├── jobs.py
+│   └── applications.py
+│
+├── .env
+├── .gitignore
+├── .python-version
+├── alembic.ini
+├── CODING_INSTRUCTIONS.md
+├── create_db.sql
+├── database.py
+├── FINAL_SCHEMA.md
+├── main.py
+├── models.py
+├── pyproject.toml
+├── README.md
+├── schemas.py
+└── uv.lock
+```
+
+Local/generated files such as `.venv/`, `__pycache__/`, and `.vscode/` may
+exist locally but are not intended to be committed as application source code.
+
+---
+
 ## Current CRUD Implementation
 
 The current API implements CRUD for the three primary entities:
@@ -889,6 +1022,51 @@ Both full replacement and partial update operations are supported.
 
 The implementation also respects the existing relational constraints rather
 than bypassing them through application shortcuts.
+
+---
+
+## Router Organization
+
+The current API is organized by resource.
+
+```text
+routers/
+│
+├── companies.py
+│   └── Company API
+│
+├── jobs.py
+│   └── Job API
+│
+├── applications.py
+│   └── Application API
+│
+└── helpers.py
+    └── Shared database/validation helpers
+```
+
+The router organization follows the FastAPI `APIRouter` pattern.
+
+Resource routes are defined using router-level decorators such as:
+
+```python
+@router.get(...)
+@router.post(...)
+@router.put(...)
+@router.patch(...)
+@router.delete(...)
+```
+
+The routers are then registered with the main FastAPI application using:
+
+```python
+app.include_router(...)
+```
+
+Common API prefixes are applied when the routers are included.
+
+This keeps resource-specific API logic separated while preserving the same
+external API structure.
 
 ---
 
@@ -925,7 +1103,8 @@ The initial FastAPI learning structure and CRUD concepts were learned while
 following **Corey Schafer's FastAPI tutorial**.
 
 Corey Schafer's tutorial served as the learning reference for understanding
-core FastAPI concepts and CRUD patterns.
+core FastAPI concepts, CRUD patterns, asynchronous architecture, and API
+organization.
 
 The implementation in this repository has subsequently been adapted into the
 Job Application Tracker's own architecture.
@@ -938,9 +1117,11 @@ The project now uses its own:
 - Pydantic schemas
 - Alembic migrations
 - Async database layer
+- API routers
 - API routes
 - Validation rules
 - Database constraints
+- Application-specific CRUD behavior
 
 Corey Schafer:
 
@@ -998,8 +1179,12 @@ Contains Pydantic request and response schemas.
 
 ### `main.py`
 
-Contains the FastAPI application, async database operations, validation
-logic, error handling, and CRUD API endpoints.
+Contains the FastAPI application, lifespan configuration, router registration,
+and application-level exception handlers.
+
+### `routers/`
+
+Contains the resource-specific API routers and shared router helpers.
 
 ### `alembic/`
 
@@ -1009,7 +1194,8 @@ Contains database migration configuration and migration revisions.
 
 ## Current Limitations
 
-The current implementation focuses on the backend CRUD foundation.
+The current implementation focuses on the backend CRUD foundation and API
+architecture.
 
 The following features are not implemented yet:
 
@@ -1024,8 +1210,7 @@ The following features are not implemented yet:
 - Deployment configuration
 - Frontend UI
 
-These features can be added incrementally after the backend foundation is
-expanded.
+These features can be added incrementally as the backend foundation expands.
 
 ---
 
@@ -1057,6 +1242,9 @@ Production Backend Improvements
 Deployment
 ```
 
+The router organization is now implemented as part of the current backend
+architecture.
+
 The exact implementation order may evolve as the project develops.
 
 ---
@@ -1070,6 +1258,7 @@ The project is intended to provide practical experience with:
 
 - REST API design
 - FastAPI
+- APIRouter-based API organization
 - Async Python
 - Pydantic validation
 - SQLAlchemy ORM
