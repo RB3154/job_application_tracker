@@ -31,8 +31,7 @@ app.include_router(applications.router, prefix="/api/applications", tags=["appli
 async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
     message = exception.detail if exception.detail else "Error occurred. Check the request and try again."
 
-    if request.url.path.startswith("/api"):
-        return JSONResponse(
+    return JSONResponse(
             status_code=exception.status_code,
             content={"detail": message},
         )
@@ -40,7 +39,7 @@ async def general_http_exception_handler(request: Request, exception: StarletteH
 
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request: Request, exception: RequestValidationError):
-    if request.url.path.startswith("/api"):
+        
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={"detail": exception.errors()},
