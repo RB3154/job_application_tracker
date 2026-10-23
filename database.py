@@ -2,18 +2,11 @@
 
 from collections.abc import AsyncGenerator
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-
-class Settings(BaseSettings):
-    """Application settings loaded from the project .env file."""
-
-    database_url: str
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+from config import settings
 
 
 def _async_postgresql_database_url(database_url: str) -> URL:
@@ -31,7 +24,6 @@ def _async_postgresql_database_url(database_url: str) -> URL:
     return url.set(drivername="postgresql+asyncpg")
 
 
-settings = Settings()
 engine = create_async_engine(_async_postgresql_database_url(settings.database_url))
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

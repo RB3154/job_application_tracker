@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,13 @@ async def get_job_or_404(job_id: str, db: AsyncSession) -> models.Job:
     return job
 
 
+async def get_user_or_404(user_id: int, db: AsyncSession) -> models.User:
+    user = await db.get(models.User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
+
+
 async def get_application_or_404(application_id: int, db: AsyncSession) -> models.Application:
     application = await db.get(models.Application, application_id)
     if not application:
@@ -47,8 +54,26 @@ async def ensure_job_url_available(job_url: str, db: AsyncSession, current_job_i
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job URL already exists")
 
 
-async def ensure_application_job_available(job_id: str, db: AsyncSession, current_application_id: int | None = None) -> None:
-    result = await db.execute(select(models.Application).where(models.Application.job_id == job_id))
+async def ensure_application_job_available(
+    user_id: int, job_id: str, db: AsyncSession, current_application_id: int | None = None
+) -> None:
+    result = await db.execute(
+        select(models.Application).where(models.Application.user_id == user_id, models.Application.job_id == job_id)
+    )
     existing_application = result.scalar_one_or_none()
     if existing_application and existing_application.application_id != current_application_id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An application already exists for this job")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This user has already applied to this job")
+
+
+async def ensure_username_available(username: str, db: AsyncSession, current_user_id: int | None = None) -> None:
+    result = await db.execute(select(models.User).where(func.lower(models.User.username) == username.lower()))
+    existing_user = result.scalar_one_or_none()
+    if existing_user and existing_user.id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+
+
+async def ensure_email_available(email: str, db: AsyncSession, current_user_id: int | None = None) -> None:
+    result = await db.execute(select(models.User).where(func.lower(models.User.email) == email.lower()))
+    existing_user = result.scalar_one_or_none()
+    if existing_user and existing_user.id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")

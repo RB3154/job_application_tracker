@@ -3,7 +3,7 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import CHAR, DECIMAL, CheckConstraint, Date, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import CHAR, DECIMAL, CheckConstraint, Date, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -57,7 +57,7 @@ class Job(Base):
     company_id: Mapped[str] = mapped_column(String(100), ForeignKey("company.company_id"), nullable=False)
 
     company: Mapped["Company"] = relationship(back_populates="jobs")
-    application: Mapped["Application | None"] = relationship(back_populates="job", uselist=False)
+    applications: Mapped[list["Application"]] = relationship(back_populates="job")
     job_locations: Mapped[list["JobLocation"]] = relationship(back_populates="job")
     locations: Mapped[list["Location"]] = relationship(
         secondary="job_location", back_populates="jobs", overlaps="job,job_locations,location"
@@ -89,17 +89,30 @@ class Application(Base):
             "current_status IN ('Applied', 'Screening', 'Interview', 'Rejected', "
             "'Offer', 'Accepted', 'Withdrawn')"
         ),
+        UniqueConstraint("user_id", "job_id"),
         Index("ix_application_date_applied", "date_applied"),
     )
 
-    application_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
-    job_id: Mapped[str] = mapped_column(String(100), ForeignKey("job.job_id"), nullable=False, unique=True)
+    application_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    job_id: Mapped[str] = mapped_column(String(100), ForeignKey("job.job_id"), nullable=False)
     date_applied: Mapped[date] = mapped_column(Date, nullable=False, server_default=text("CURRENT_DATE"))
     current_status: Mapped[str | None] = mapped_column(
         String(30), nullable=True, server_default=text("'Applied'")
     )
 
-    job: Mapped["Job"] = relationship(back_populates="application")
+    job: Mapped["Job"] = relationship(back_populates="applications")
+    user: Mapped["User"] = relationship(back_populates="applications")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+
+    applications: Mapped[list["Application"]] = relationship(back_populates="user", passive_deletes=True)
 
 
 class Location(Base):

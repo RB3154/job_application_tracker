@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import models
 from database import Base, engine
-from routers import applications, companies, jobs
+from routers import applications, companies, jobs, users
 
 
 @asynccontextmanager
@@ -25,6 +25,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
+app.include_router(users.router, prefix="/api/users", tags=["users"])
 
 
 @app.exception_handler(StarletteHTTPException)

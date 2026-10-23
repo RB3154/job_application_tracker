@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 ApplicationStatus = Literal[
@@ -110,13 +110,14 @@ class ApplicationBase(BaseModel):
 
 
 class ApplicationCreate(ApplicationBase):
-    application_id: int
+    user_id: int
 
 
 class ApplicationResponse(ApplicationBase):
     model_config = ConfigDict(from_attributes=True)
 
     application_id: int
+    user_id: int
 
 
 class ApplicationReplace(BaseModel):
@@ -129,3 +130,23 @@ class ApplicationUpdate(BaseModel):
     job_id: str = Field(default=None, min_length=1, max_length=100)
     date_applied: date = None
     current_status: ApplicationStatus | None = None
+
+
+class UserBase(BaseModel):
+    username: str = Field(min_length=1, max_length=50)
+    email: EmailStr = Field(max_length=255)
+
+
+class UserCreate(UserBase):
+    pass
+
+
+class UserResponse(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+
+
+class UserUpdate(BaseModel):
+    username: str = Field(default=None, min_length=1, max_length=50)
+    email: EmailStr = Field(default=None, max_length=255)
