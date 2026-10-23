@@ -35,6 +35,7 @@ async def general_http_exception_handler(request: Request, exception: StarletteH
     return JSONResponse(
             status_code=exception.status_code,
             content={"detail": message},
+            headers=exception.headers,
         )
 
 

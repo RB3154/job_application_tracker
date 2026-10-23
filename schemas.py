@@ -110,7 +110,7 @@ class ApplicationBase(BaseModel):
 
 
 class ApplicationCreate(ApplicationBase):
-    user_id: int
+    pass
 
 
 class ApplicationResponse(ApplicationBase):
@@ -138,7 +138,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    pass
+    password: str = Field(min_length=8, max_length=128)
 
 
 class UserResponse(UserBase):
@@ -150,3 +150,8 @@ class UserResponse(UserBase):
 class UserUpdate(BaseModel):
     username: str = Field(default=None, min_length=1, max_length=50)
     email: EmailStr = Field(default=None, max_length=255)
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

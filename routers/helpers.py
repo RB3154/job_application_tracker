@@ -33,16 +33,11 @@ async def get_job_or_404(job_id: str, db: AsyncSession) -> models.Job:
     return job
 
 
-async def get_user_or_404(user_id: int, db: AsyncSession) -> models.User:
-    user = await db.get(models.User, user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
+async def get_application_or_404(application_id: int, user_id: int, db: AsyncSession) -> models.Application:
+    """Return the user's application; another user's application is reported as not found."""
 
-
-async def get_application_or_404(application_id: int, db: AsyncSession) -> models.Application:
     application = await db.get(models.Application, application_id)
-    if not application:
+    if not application or application.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
     return application
 
