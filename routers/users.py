@@ -6,10 +6,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
-from auth import create_access_token, get_current_user, hash_password, verify_password
+from auth import CurrentUser, create_access_token, hash_password, verify_password
 from database import get_db
-from routers.helpers import commit_or_raise_conflict, ensure_email_available, ensure_username_available
-from schemas import Token, UserCreate, UserResponse, UserUpdate
+from routers.helpers import commit_or_raise_conflict, ensure_email_available, ensure_username_available, get_user_or_404
+from schemas import Token, UserCreate, UserPrivate, UserPublic, UserUpdate
 
 
 router = APIRouter()
@@ -18,7 +18,7 @@ router = APIRouter()
 DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-timing")
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
 async def create_user(user_data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     await ensure_username_available(user_data.username, db)
     await ensure_email_available(user_data.email, db)
@@ -48,18 +48,19 @@ async def login_for_access_token(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return Token(access_token=create_access_token(user.id), token_type="bearer")
+    access_token = create_access_token(data={"sub": str(user.id)})
+    return Token(access_token=access_token, token_type="bearer")
 
 
-@router.get("/me", response_model=UserResponse)
-async def get_me(current_user: Annotated[models.User, Depends(get_current_user)]):
+@router.get("/me", response_model=UserPrivate)
+async def get_me(current_user: CurrentUser):
     return current_user
 
 
-@router.patch("/me", response_model=UserResponse)
+@router.patch("/me", response_model=UserPrivate)
 async def update_me(
     user_data: UserUpdate,
-    current_user: Annotated[models.User, Depends(get_current_user)],
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     values = user_data.model_dump(exclude_unset=True)
@@ -76,9 +77,11 @@ async def update_me(
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_me(
-    current_user: Annotated[models.User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
+async def delete_me(current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     await db.delete(current_user)
     await commit_or_raise_conflict(db)
+
+
+@router.get("/{user_id}", response_model=UserPublic)
+async def get_user(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+    return await get_user_or_404(user_id, db)

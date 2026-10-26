@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
-from auth import get_current_user
+from auth import CurrentUser
 from database import get_db
 from routers.helpers import (
     commit_or_raise_conflict,
@@ -17,8 +17,6 @@ from schemas import ApplicationCreate, ApplicationReplace, ApplicationResponse, 
 
 
 router = APIRouter()
-
-CurrentUser = Annotated[models.User, Depends(get_current_user)]
 
 
 @router.get("", response_model=list[ApplicationResponse])

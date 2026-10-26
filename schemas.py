@@ -141,10 +141,19 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
 
 
-class UserResponse(UserBase):
+class UserPublic(BaseModel):
+    """What anyone can see about a user."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    username: str
+
+
+class UserPrivate(UserPublic):
+    """What only the user themselves can see."""
+
+    email: EmailStr
 
 
 class UserUpdate(BaseModel):

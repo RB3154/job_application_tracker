@@ -60,8 +60,10 @@ Operations for users:
 - Register a user (with a password)
 - Log in with email and password to receive a JWT access token
 - Retrieve the logged-in user (`/me`)
-- Partially update the logged-in user using PATCH
-- Delete the logged-in user (their applications are deleted with them)
+- Retrieve any user's public profile (`/{user_id}`: id and username only)
+- Partially update the logged-in user using PATCH `/me`
+- Delete the logged-in user with DELETE `/me` (their applications are deleted
+  with them)
 
 Users have:
 
@@ -69,7 +71,8 @@ Users have:
 - Email (unique, validated, stored in lowercase)
 - Password (at least 8 characters, stored only as an Argon2 hash)
 
-A user can only view or change their own account.
+A user can only change or delete their own account. Emails are only shown to
+the user themselves.
 
 Each user owns their own applications. Companies and jobs are shared between
 all users.
@@ -225,8 +228,8 @@ Contains all application CRUD endpoints.
 routers/users.py
 ```
 
-Contains registration, login (`/token`), and the logged-in user's account
-endpoints (`/me`).
+Contains registration, login (`/token`), the logged-in user's account
+endpoints (`/me`), and public profiles (`/{user_id}`).
 
 ### Shared Router Helpers
 
@@ -517,12 +520,14 @@ from the token, so creating an application only needs a `job_id`; the
 ```text
 POST    /api/users          (register, public)
 POST    /api/users/token    (log in, public)
-GET     /api/users/me       (login required)
-PATCH   /api/users/me       (login required)
-DELETE  /api/users/me       (login required)
+GET     /api/users/me           (login required)
+PATCH   /api/users/me           (login required)
+DELETE  /api/users/me           (login required)
+GET     /api/users/{user_id}    (public, username only)
 ```
 
-Company and job endpoints are currently public.
+Company and job `GET` endpoints are public. Creating, replacing, updating, and
+deleting companies or jobs requires login (any logged-in user).
 
 ---
 
@@ -833,13 +838,15 @@ taken from the access token. `ApplicationResponse` includes both
 ```text
 UserBase
 UserCreate
-UserResponse
+UserPublic
+UserPrivate
 UserUpdate
 Token
 ```
 
-`UserCreate` includes the password; `UserResponse` never includes the password
-or its hash. `Token` is the login response (`access_token`, `token_type`).
+`UserCreate` includes the password. `UserPublic` (id, username) is what anyone
+can see; `UserPrivate` adds the email and is only returned to the user
+themselves. Neither includes the password or its hash. `Token` is the login response (`access_token`, `token_type`).
 
 Pydantic is responsible for validating API input before it reaches the
 database.
@@ -901,6 +908,7 @@ The API handles common error conditions including:
 - Database constraint conflicts
 - Invalid request data
 - Missing, invalid, or expired access tokens
+- Accessing another user's application (`403 Forbidden`)
 - Incorrect email or password at login
 
 HTTP status codes are used to communicate errors.
@@ -956,8 +964,9 @@ It provides:
 
 - `hash_password()` / `verify_password()` — Argon2 password hashing via
   `pwdlib`
-- `create_access_token()` — creates a signed JWT whose `sub` claim is the
-  user ID, with an `exp` expiry (default 30 minutes)
+- `create_access_token(data)` — creates a signed JWT from the given claims
+  (login passes `{"sub": "<user id>"}`) and adds an `exp` expiry (default 30
+  minutes)
 - `verify_access_token()` — verifies the signature and requires the `exp` and
   `sub` claims, returning the user ID or `None`
 - `oauth2_scheme` — an `OAuth2PasswordBearer` scheme with token URL
@@ -965,6 +974,8 @@ It provides:
 - `get_current_user()` — a FastAPI dependency that resolves the bearer token
   to a `User`, or raises `401 Unauthorized` with a
   `WWW-Authenticate: Bearer` header
+- `CurrentUser` — shorthand for `Annotated[User, Depends(get_current_user)]`,
+  used by routers to require login
 
 Tokens are signed with `SECRET_KEY` using the configured algorithm (`HS256` by
 default).
@@ -1001,9 +1012,12 @@ emails are registered.
 Routes that depend on `get_current_user` require a valid token:
 
 - All `/api/applications` endpoints
+- `POST`, `PUT`, `PATCH`, and `DELETE` on `/api/companies` and `/api/jobs`
 - `GET`, `PATCH`, and `DELETE /api/users/me`
 
-Requests without a valid token receive `401 Unauthorized`.
+Requests without a valid token receive `401 Unauthorized`. A logged-in user
+who tries to read or change another user's application receives
+`403 Forbidden`.
 
 ### Using Swagger UI
 
@@ -1267,7 +1281,8 @@ Application
 ```
 
 Users support registration, login, and reading, partially updating (PATCH),
-and deleting their own account through `/api/users/me`.
+and deleting their own account through `/api/users/me`, and viewing any
+user's public profile through `/api/users/{user_id}`.
 
 Both full replacement and partial update operations are supported.
 

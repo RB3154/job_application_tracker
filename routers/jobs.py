@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
+from auth import CurrentUser
 from database import get_db
 from routers.helpers import commit_or_raise_conflict, ensure_job_url_available, get_company_or_404, get_job_or_404
 from schemas import JobBase, JobCreate, JobResponse, JobUpdate
@@ -21,7 +22,7 @@ async def get_jobs(db: Annotated[AsyncSession, Depends(get_db)]):
 
 
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
-async def create_job(job_data: JobCreate, db: Annotated[AsyncSession, Depends(get_db)]):
+async def create_job(job_data: JobCreate, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     if await db.get(models.Job, job_data.job_id):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job ID already exists")
     await get_company_or_404(job_data.company_id, db)
@@ -39,7 +40,7 @@ async def get_job(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]):
 
 
 @router.put("/{job_id}", response_model=JobResponse)
-async def replace_job(job_id: str, job_data: JobBase, db: Annotated[AsyncSession, Depends(get_db)]):
+async def replace_job(job_id: str, job_data: JobBase, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     job = await get_job_or_404(job_id, db)
     values = job_data.model_dump()
     if "company_id" in values and values["company_id"] != job.company_id:
@@ -54,7 +55,7 @@ async def replace_job(job_id: str, job_data: JobBase, db: Annotated[AsyncSession
 
 
 @router.patch("/{job_id}", response_model=JobResponse)
-async def update_job(job_id: str, job_data: JobUpdate, db: Annotated[AsyncSession, Depends(get_db)]):
+async def update_job(job_id: str, job_data: JobUpdate, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     job = await get_job_or_404(job_id, db)
     try:
         job_data.validate_ranges_against(job)
@@ -73,7 +74,7 @@ async def update_job(job_id: str, job_data: JobUpdate, db: Annotated[AsyncSessio
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_job(job_id: str, db: Annotated[AsyncSession, Depends(get_db)]):
+async def delete_job(job_id: str, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     job = await get_job_or_404(job_id, db)
     dependent_models = (models.Application, models.JobLocation, models.JobWorkMode, models.JobSkill, models.JobEducation, models.JobSource)
     for dependent in dependent_models:

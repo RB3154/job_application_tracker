@@ -27,12 +27,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_hash.verify(plain_password, hashed_password)
 
 
-def create_access_token(user_id: int, expires_delta: timedelta | None = None) -> str:
-    """Create a JWT access token whose subject is the given user's id."""
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    """Create a JWT access token from the given claims (e.g. {"sub": user id})."""
 
+    to_encode = data.copy()
     expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
-    payload = {"sub": str(user_id), "exp": expire}
-    return jwt.encode(payload, settings.secret_key.get_secret_value(), algorithm=settings.algorithm)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.secret_key.get_secret_value(), algorithm=settings.algorithm)
 
 
 def verify_access_token(token: str) -> str | None:
@@ -68,3 +69,6 @@ async def get_current_user(
     if user is None:
         raise credentials_error
     return user
+
+
+CurrentUser = Annotated[models.User, Depends(get_current_user)]
