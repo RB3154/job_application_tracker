@@ -1210,6 +1210,32 @@ http://127.0.0.1:8000/docs
 
 ---
 
+## Running Tests
+
+The `tests/` folder contains automated API tests written with `pytest` and
+FastAPI's `TestClient`. They send the same requests you would send in Swagger
+and check the responses:
+
+- `tests/test_users.py` — sign up, login, public profiles, `/me`
+- `tests/test_companies_jobs.py` — public reads, login required for writes
+- `tests/test_applications.py` — owner access, `403` for other users, `404`s,
+  one application per job per user
+- `tests/conftest.py` — shared fixtures (test client, test users, test job)
+
+PostgreSQL must be running and `.env` must be configured. The server does not
+need to be running. Then:
+
+```bash
+uv sync
+uv run pytest -v
+```
+
+The tests use the database configured in `.env`. Every user, company, and job
+they create has a random suffix in its name (for example `rudra_3f9a1c2b`), and
+everything they create is deleted at the end of the run.
+
+---
+
 ## Project Structure
 
 The current project structure is approximately:
@@ -1233,6 +1259,12 @@ job_application_tracker/
 │   ├── jobs.py
 │   ├── applications.py
 │   └── users.py
+│
+├── tests/
+│   ├── conftest.py
+│   ├── test_applications.py
+│   ├── test_companies_jobs.py
+│   └── test_users.py
 │
 ├── .env
 ├── .env.example
