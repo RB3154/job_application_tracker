@@ -112,8 +112,15 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    image_file: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     applications: Mapped[list["Application"]] = relationship(back_populates="user", passive_deletes=True)
+
+    @property
+    def image_path(self) -> str | None:
+        """URL of the profile picture, or None if the user hasn't uploaded one."""
+
+        return f"/media/profile_pics/{self.image_file}" if self.image_file else None
 
 
 class Location(Base):

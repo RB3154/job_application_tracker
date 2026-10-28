@@ -3,10 +3,12 @@
 from conftest import PASSWORD, make_user, unique
 
 
-# Signing up returns the new user's id, username and email (never the password).
+# Signing up returns the new user's profile (never the password). There's no picture yet.
 def test_signup_returns_private_profile(rudra):
     user, _ = rudra
-    assert set(user) == {"id", "username", "email"}
+    assert set(user) == {"id", "username", "email", "image_file", "image_path"}
+    assert user["image_file"] is None
+    assert user["image_path"] is None
 
 
 # Signing up with a username that's already taken is refused with 409.
@@ -39,7 +41,7 @@ def test_public_profile_hides_email(client, aman):
     user, _ = aman
     response = client.get(f"/api/users/{user['id']}")
     assert response.status_code == 200
-    assert response.json() == {"id": user["id"], "username": user["username"]}
+    assert response.json() == {"id": user["id"], "username": user["username"], "image_file": None, "image_path": None}
 
 
 # Viewing a user that doesn't exist gives 404.

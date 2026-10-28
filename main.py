@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import models
 from database import Base, engine
+from image import PROFILE_PICS_DIR
 from routers import applications, companies, jobs, users
 
 
@@ -26,6 +28,11 @@ app.include_router(companies.router, prefix="/api/companies", tags=["companies"]
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+
+# Serve uploaded files, so /media/profile_pics/<file>.jpg opens the picture.
+# StaticFiles needs the folder to exist when the app starts.
+PROFILE_PICS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 @app.exception_handler(StarletteHTTPException)

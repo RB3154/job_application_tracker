@@ -148,6 +148,8 @@ class UserPublic(BaseModel):
 
     id: int
     username: str
+    image_file: str | None
+    image_path: str | None
 
 
 class UserPrivate(UserPublic):

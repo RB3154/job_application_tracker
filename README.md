@@ -62,8 +62,11 @@ Operations for users:
 - Retrieve the logged-in user (`/me`)
 - Retrieve any user's public profile (`/{user_id}`: id and username only)
 - Partially update the logged-in user using PATCH `/me`
-- Delete the logged-in user with DELETE `/me` (their applications are deleted
-  with them)
+- Delete the logged-in user with DELETE `/me` (their applications and profile
+  picture are deleted with them)
+- Upload a profile picture with PATCH `/me/picture` (cropped to a 300x300 JPEG,
+  max 5 MB)
+- Remove the profile picture with DELETE `/me/picture`
 
 Users have:
 
@@ -134,6 +137,7 @@ Withdrawn
 | email-validator | Email validation for Pydantic `EmailStr` (via `fastapi[standard]`) |
 | PyJWT | JWT access token creation and verification |
 | pwdlib (Argon2) | Password hashing |
+| Pillow | Profile picture cropping and resizing |
 | uv | Python package and environment management |
 
 ---
@@ -524,6 +528,8 @@ POST    /api/users/token    (log in, public)
 GET     /api/users/me           (login required)
 PATCH   /api/users/me           (login required)
 DELETE  /api/users/me           (login required)
+PATCH   /api/users/me/picture   (login required, multipart file upload)
+DELETE  /api/users/me/picture   (login required)
 GET     /api/users/{user_id}    (public, username only)
 ```
 
@@ -787,6 +793,9 @@ case-insensitively and stores emails in lowercase.
 
 `password_hash` is required. Plain-text passwords are never stored.
 
+`image_file` is optional. It holds only the picture's filename; the picture
+itself is saved on disk in `media/profile_pics/`.
+
 Foreign-key relationships are also validated before creating or updating
 dependent records.
 
@@ -845,9 +854,11 @@ UserUpdate
 Token
 ```
 
-`UserCreate` includes the password. `UserPublic` (id, username) is what anyone
-can see; `UserPrivate` adds the email and is only returned to the user
-themselves. Neither includes the password or its hash. `Token` is the login response (`access_token`, `token_type`).
+`UserCreate` includes the password. `UserPublic` (id, username, `image_file`,
+`image_path`) is what anyone can see; `UserPrivate` adds the email and is only returned to the user
+themselves. Neither includes the password or its hash. `image_path` is the
+URL of the profile picture (e.g. `/media/profile_pics/<file>.jpg`), or `null`
+if the user hasn't uploaded one. `Token` is the login response (`access_token`, `token_type`).
 
 Pydantic is responsible for validating API input before it reaches the
 database.
@@ -1016,6 +1027,7 @@ Routes that depend on `get_current_user` require a valid token:
 - All `/api/applications` endpoints
 - `POST`, `PUT`, `PATCH`, and `DELETE` on `/api/companies` and `/api/jobs`
 - `GET`, `PATCH`, and `DELETE /api/users/me`
+- `PATCH` and `DELETE /api/users/me/picture`
 
 Requests without a valid token receive `401 Unauthorized`. A logged-in user
 who tries to read or change another user's application receives
@@ -1049,6 +1061,7 @@ A single `Settings` class (built on `pydantic-settings`) loads values from
 | `secret_key` | `SECRET_KEY` | required, at least 32 characters |
 | `algorithm` | `ALGORITHM` | `HS256` |
 | `access_token_expire_minutes` | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` |
+| `max_upload_size_bytes` | `MAX_UPLOAD_SIZE_BYTES` | `5242880` (5 MB) |
 
 `secret_key` is stored as a `SecretStr` so it is not shown in logs or reprs.
 
@@ -1073,6 +1086,10 @@ Message: add users and application ownership
 Revision: 5c1e7a2f9d34
 Revises:  2bc8d0960952
 Message: add user password hash
+
+Revision: 8d4b2e6f1a73
+Revises:  5c1e7a2f9d34
+Message: add user image file
 ```
 
 The `2bc8d0960952` migration:
@@ -1091,6 +1108,10 @@ The `2bc8d0960952` migration:
 The `5c1e7a2f9d34` migration adds a required `password_hash` column to
 `users`. It requires the `users` table to be empty, because existing users
 have no password to fill it with.
+
+The `8d4b2e6f1a73` migration adds an optional `image_file` column to `users`
+for the profile picture's filename. Existing users simply get `NULL` (no
+picture), so it is safe to run on a database that already has users.
 
 The Alembic environment has been configured to work with the project's
 asynchronous SQLAlchemy engine while using Alembic's migration API.
@@ -1217,6 +1238,9 @@ FastAPI's `TestClient`. They send the same requests you would send in Swagger
 and check the responses:
 
 - `tests/test_users.py` — sign up, login, public profiles, `/me`
+- `tests/test_pictures.py` — profile picture upload and delete: resizing to
+  300x300 JPEG, other image types, replacing, size limit, non-image files,
+  login required, picture removed with the account
 - `tests/test_companies_jobs.py` — public reads, login required for writes
 - `tests/test_applications.py` — owner access, `403` for other users, `404`s,
   one application per job per user
@@ -1232,7 +1256,15 @@ uv run pytest -v
 
 The tests use the database configured in `.env`. Every user, company, and job
 they create has a random suffix in its name (for example `rudra_3f9a1c2b`), and
-everything they create is deleted at the end of the run.
+everything they create is deleted at the end of the run. The picture tests
+make their test images in memory, and the pictures they upload to
+`media/profile_pics/` are removed when their test users are deleted.
+
+To run only one file, for example the picture tests:
+
+```bash
+uv run pytest tests/test_pictures.py -v
+```
 
 ---
 
@@ -1247,7 +1279,8 @@ job_application_tracker/
 │   ├── versions/
 │   │   ├── 09f2cd3da047_initial_schema.py
 │   │   ├── 2bc8d0960952_add_users_and_application_ownership.py
-│   │   └── 5c1e7a2f9d34_add_user_password_hash.py
+│   │   ├── 5c1e7a2f9d34_add_user_password_hash.py
+│   │   └── 8d4b2e6f1a73_add_user_image_file.py
 │   ├── env.py
 │   ├── README
 │   └── script.py.mako
@@ -1264,6 +1297,7 @@ job_application_tracker/
 │   ├── conftest.py
 │   ├── test_applications.py
 │   ├── test_companies_jobs.py
+│   ├── test_pictures.py
 │   └── test_users.py
 │
 ├── .env
@@ -1272,11 +1306,10 @@ job_application_tracker/
 ├── .python-version
 ├── alembic.ini
 ├── auth.py
-├── CODING_INSTRUCTIONS.md
 ├── config.py
 ├── create_db.sql
 ├── database.py
-├── FINAL_SCHEMA.md
+├── image.py
 ├── main.py
 ├── models.py
 ├── pyproject.toml
@@ -1285,8 +1318,8 @@ job_application_tracker/
 └── uv.lock
 ```
 
-Local/generated files such as `.venv/`, `__pycache__/`, and `.vscode/` may
-exist locally but are not intended to be committed as application source code.
+Local/generated files such as `.venv/`, `__pycache__/`, `.vscode/`, and
+uploaded pictures in `media/` may exist locally but are not intended to be committed as application source code.
 
 ---
 
@@ -1315,7 +1348,8 @@ Application
 ```
 
 Users support registration, login, and reading, partially updating (PATCH),
-and deleting their own account through `/api/users/me`, and viewing any
+and deleting their own account through `/api/users/me`, uploading and
+removing a profile picture through `/api/users/me/picture`, and viewing any
 user's public profile through `/api/users/{user_id}`.
 
 Both full replacement and partial update operations are supported.
@@ -1442,28 +1476,6 @@ https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH
 
 ## Project Documentation
 
-### `FINAL_SCHEMA.md`
-
-The authoritative specification for the database schema.
-
-It defines:
-
-- Tables
-- Columns
-- Data types
-- Nullability
-- Primary keys
-- Foreign keys
-- Unique constraints
-- Check constraints
-- Defaults
-- Indexes
-- Relationships
-
-### `CODING_INSTRUCTIONS.md`
-
-Contains project-specific development and implementation rules.
-
 ### `create_db.sql`
 
 Contains the PostgreSQL database creation SQL.
@@ -1482,6 +1494,11 @@ secret key, algorithm, and token lifetime).
 Contains password hashing, JWT access token helpers, and the
 `get_current_user` dependency.
 
+### `image.py`
+
+Contains the profile picture helpers: cropping and resizing an upload to a
+300x300 JPEG with Pillow, saving it to `media/profile_pics/`, and deleting it.
+
 ### `database.py`
 
 Contains the asynchronous PostgreSQL and SQLAlchemy database configuration.
@@ -1497,7 +1514,8 @@ Contains Pydantic request and response schemas.
 ### `main.py`
 
 Contains the FastAPI application, lifespan configuration, router registration,
-and application-level exception handlers.
+the `/media` static files mount for profile pictures, and application-level
+exception handlers.
 
 ### `routers/`
 
@@ -1543,7 +1561,9 @@ API Organization with Routers
   ↓
 Users, Application Ownership & Auth Utilities
   ↓
-Login Endpoint & Protected Routes   ← current
+Login Endpoint & Protected Routes
+  ↓
+Profile Picture Uploads   ← current
   ↓
 Admin Rights for Companies and Jobs
   ↓
@@ -1562,8 +1582,8 @@ Production Backend Improvements
 Deployment
 ```
 
-The router organization, users, application ownership, login, and protected
-application routes are now implemented as part of the current backend
+The router organization, users, application ownership, login, protected
+application routes, and profile picture uploads are now implemented as part of the current backend
 architecture.
 
 The exact implementation order may evolve as the project develops.

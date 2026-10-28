@@ -17,3 +17,6 @@ wheels/
 
 # Test cache
 .pytest_cache/
+
+# Uploaded profile pictures
+media/
