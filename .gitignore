@@ -15,8 +15,5 @@ wheels/
 # Environment / secrets
 .env
 
-# Test cache
-.pytest_cache/
-
 # Uploaded profile pictures
 media/

@@ -1,0 +1,131 @@
+<!-- Company and job forms (create + edit). The JavaScript for them is in static/js/forms.js. -->
+<div class="modal fade" id="companyModal" tabindex="-1" aria-labelledby="companyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <form id="companyForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="companyModalLabel">New company</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger form-error d-none" role="alert"></div>
+                    <div class="mb-3">
+                        <label for="companyName" class="form-label">Company name</label>
+                        <input type="text" class="form-control" id="companyName" name="company_name" required maxlength="255">
+                    </div>
+                    <div class="mb-3">
+                        <label for="companyId" class="form-label">Company ID</label>
+                        <input type="text" class="form-control" id="companyId" name="company_id" required maxlength="100">
+                        <div class="form-text">A short unique id used in the URL. Filled in from the name; you can change it.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="companySite" class="form-label">Website <span class="text-muted-soft">(optional)</span></label>
+                        <input type="url" class="form-control" id="companySite" name="company_site" placeholder="https://">
+                    </div>
+                    <div class="mb-1">
+                        <label for="companyDescription" class="form-label">Description <span class="text-muted-soft">(optional)</span></label>
+                        <textarea class="form-control" id="companyDescription" name="company_description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create company</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="jobModal" tabindex="-1" aria-labelledby="jobModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form id="jobForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="jobModalLabel">New job</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger form-error d-none" role="alert"></div>
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label for="jobRole" class="form-label">Role</label>
+                            <input type="text" class="form-control" id="jobRole" name="role" required maxlength="255" placeholder="e.g. Backend Engineer">
+                        </div>
+                        <div class="col-md-5">
+                            <label for="jobCompany" class="form-label">Company</label>
+                            <select class="form-select" id="jobCompany" name="company_id" required></select>
+                        </div>
+                        <div class="col-md-7">
+                            <label for="jobUrl" class="form-label">Job posting URL</label>
+                            <input type="url" class="form-control" id="jobUrl" name="job_url" required placeholder="https://">
+                        </div>
+                        <div class="col-md-5">
+                            <label for="jobId" class="form-label">Job ID</label>
+                            <input type="text" class="form-control" id="jobId" name="job_id" required maxlength="100">
+                            <div class="form-text">Filled in for you; must be unique.</div>
+                        </div>
+                        <div class="col-6">
+                            <label for="jobPostingDate" class="form-label">Posted on</label>
+                            <input type="date" class="form-control" id="jobPostingDate" name="job_posting_date" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="jobDeadline" class="form-label">Apply by <span class="text-muted-soft">(optional)</span></label>
+                            <input type="date" class="form-control" id="jobDeadline" name="application_deadline">
+                        </div>
+                        <div class="col-12">
+                            <p class="section-title mb-0 mt-2">Experience <span class="text-lowercase fw-normal">(optional)</span></p>
+                        </div>
+                        <div class="col-4">
+                            <label for="jobExpMin" class="form-label">Min years</label>
+                            <input type="number" class="form-control" id="jobExpMin" name="exp_min" min="0" max="999" step="0.5">
+                        </div>
+                        <div class="col-4">
+                            <label for="jobExpMax" class="form-label">Max years</label>
+                            <input type="number" class="form-control" id="jobExpMax" name="exp_max" min="0" max="999" step="0.5">
+                        </div>
+                        <div class="col-4">
+                            <label for="jobExpText" class="form-label">As written</label>
+                            <input type="text" class="form-control" id="jobExpText" name="exp_text" placeholder="e.g. 2+ years">
+                        </div>
+                        <div class="col-12">
+                            <p class="section-title mb-0 mt-2">Salary <span class="text-lowercase fw-normal">(optional)</span></p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="jobSalaryMin" class="form-label">Min</label>
+                            <input type="number" class="form-control" id="jobSalaryMin" name="salary_min" min="0" step="any">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="jobSalaryMax" class="form-label">Max</label>
+                            <input type="number" class="form-control" id="jobSalaryMax" name="salary_max" min="0" step="any">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="jobCurrency" class="form-label">Currency</label>
+                            <input type="text" class="form-control text-uppercase" id="jobCurrency" name="salary_currency" minlength="3" maxlength="3" placeholder="e.g. INR">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label for="jobPeriod" class="form-label">Per</label>
+                            <select class="form-select" id="jobPeriod" name="salary_period">
+                                <option value=""></option>
+                                <option value="year">year</option>
+                                <option value="month">month</option>
+                                <option value="week">week</option>
+                                <option value="hour">hour</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="jobSalaryText" class="form-label">Salary as written</label>
+                            <input type="text" class="form-control" id="jobSalaryText" name="salary_text" placeholder="e.g. ₹12–18 LPA">
+                        </div>
+                        <div class="col-12">
+                            <label for="jobDescription" class="form-label">Job description</label>
+                            <textarea class="form-control" id="jobDescription" name="JD" rows="6" required></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create job</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

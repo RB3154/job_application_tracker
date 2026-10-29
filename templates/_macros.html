@@ -1,0 +1,94 @@
+{# Reusable template pieces. The JavaScript versions are in static/js/utils.js (formatSalary, etc.)
+   so cards added by "Load more" look the same as these server-rendered ones. #}
+
+{# 2026-10-05 -> Oct 5, 2026 #}
+{% macro fmt_date(value) -%}
+    {{ value.strftime("%b") }} {{ value.day }}, {{ value.year }}
+{%- endmacro %}
+
+{% macro fmt_number(value) -%}
+    {{ "{:,.2f}".format(value).rstrip("0").rstrip(".") }}
+{%- endmacro %}
+
+{% macro salary(job) -%}
+    {%- if job.salary_min is not none or job.salary_max is not none -%}
+        {{ job.salary_currency ~ " " if job.salary_currency }}
+        {%- if job.salary_min is not none and job.salary_max is not none -%}
+            {{ fmt_number(job.salary_min) }} – {{ fmt_number(job.salary_max) }}
+        {%- elif job.salary_min is not none -%}
+            {{ fmt_number(job.salary_min) }}+
+        {%- else -%}
+            up to {{ fmt_number(job.salary_max) }}
+        {%- endif -%}
+        {{ " / " ~ job.salary_period if job.salary_period }}
+    {%- elif job.salary_text -%}
+        {{ job.salary_text }}
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro experience(job) -%}
+    {%- if job.exp_min is not none and job.exp_max is not none -%}
+        {{ "{:g}".format(job.exp_min | float) }}–{{ "{:g}".format(job.exp_max | float) }} yrs
+    {%- elif job.exp_min is not none -%}
+        {{ "{:g}".format(job.exp_min | float) }}+ yrs
+    {%- elif job.exp_max is not none -%}
+        up to {{ "{:g}".format(job.exp_max | float) }} yrs
+    {%- elif job.exp_text -%}
+        {{ job.exp_text }}
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro deadline_badge(deadline, today) -%}
+    {%- if deadline -%}
+        {%- set days = (deadline - today).days -%}
+        {%- if days < 0 -%}
+            <span class="badge text-bg-secondary">Closed</span>
+        {%- elif days == 0 -%}
+            <span class="badge text-bg-danger">Closes today</span>
+        {%- elif days <= 7 -%}
+            <span class="badge text-bg-warning">Closes in {{ days }} day{{ "s" if days != 1 }}</span>
+        {%- else -%}
+            <span class="badge bg-body-secondary text-body">Apply by {{ fmt_date(deadline) }}</span>
+        {%- endif -%}
+    {%- endif -%}
+{%- endmacro %}
+
+{# Only http(s) links become clickable, so a saved "javascript:..." URL can't run code. #}
+{% macro safe_link(url, text=None) -%}
+    {%- if url and url.lower().startswith(("http://", "https://")) -%}
+        <a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ text or url }} <i class="bi bi-box-arrow-up-right small"></i></a>
+    {%- elif url -%}
+        {{ text or url }}
+    {%- endif -%}
+{%- endmacro %}
+
+{# One job in a list. `show_company` is off on a company's own page. #}
+{% macro job_card(job, today, show_company=True) %}
+    <article class="content-section card-link-hover p-3 p-md-4 mb-3">
+        <div class="d-flex gap-3">
+            {% if show_company %}
+                <span class="company-logo" aria-hidden="true">{{ job.company.company_name[:1] | upper }}</span>
+            {% endif %}
+            <div class="flex-grow-1 min-w-0">
+                <div class="d-flex flex-wrap justify-content-between gap-2">
+                    <div>
+                        <a class="job-title" href="{{ url_for('job_page', job_id=job.job_id) }}">{{ job.role }}</a>
+                        {% if show_company %}
+                            <div>
+                                <a class="text-body" href="{{ url_for('company_page', company_id=job.company_id) }}">{{ job.company.company_name }}</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div>{{ deadline_badge(job.application_deadline, today) }}</div>
+                </div>
+                <div class="job-meta mt-2">
+                    <span><i class="bi bi-calendar3"></i>Posted {{ fmt_date(job.job_posting_date) }}</span>
+                    {% set job_salary = salary(job) %}
+                    {% if job_salary %}<span><i class="bi bi-cash-stack"></i>{{ job_salary }}</span>{% endif %}
+                    {% set job_experience = experience(job) %}
+                    {% if job_experience %}<span><i class="bi bi-bar-chart"></i>{{ job_experience }}</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </article>
+{% endmacro %}

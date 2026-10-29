@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import job_card, safe_link with context %}
+{% block content %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small">
+            <li class="breadcrumb-item"><a href="{{ url_for('companies_page') }}">Companies</a></li>
+            <li class="breadcrumb-item active text-truncate" aria-current="page">{{ company.company_name }}</li>
+        </ol>
+    </nav>
+    <section class="content-section p-4 mb-4">
+        <div class="d-flex flex-column flex-sm-row gap-3">
+            <span class="company-logo lg" aria-hidden="true">{{ company.company_name[:1] | upper }}</span>
+            <div class="flex-grow-1">
+                <h1 class="h3 mb-1">{{ company.company_name }}</h1>
+                <div class="job-meta">
+                    {% if company.company_site %}
+                        <span><i class="bi bi-globe"></i>{{ safe_link(company.company_site) }}</span>
+                    {% endif %}
+                    {% if company.locations %}
+                        <span><i class="bi bi-geo-alt"></i>{{ company.locations | map(attribute="name") | join(", ") }}</span>
+                    {% endif %}
+                    <span><i class="bi bi-briefcase"></i>{{ jobs | length }} job{{ "s" if jobs | length != 1 }}</span>
+                </div>
+            </div>
+            <div class="d-flex gap-2 align-items-start">
+                <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="editCompanyBtn" data-logged-in-only>
+                    <i class="bi bi-pencil"></i> Edit
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm d-none" id="deleteCompanyBtn" data-logged-in-only>
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+        {% if company.company_description %}
+            <p class="job-description mt-3 mb-0">{{ company.company_description }}</p>
+        {% endif %}
+    </section>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">Jobs at {{ company.company_name }}</h2>
+        <button type="button"
+                class="btn btn-primary btn-sm d-none"
+                data-open-form="job"
+                data-company-id="{{ company.company_id }}"
+                data-logged-in-only>
+            <i class="bi bi-plus-lg"></i> Add job
+        </button>
+    </div>
+    {% for job in jobs %}
+        {{ job_card(job, today, show_company=False) }}
+    {% else %}
+        <div class="content-section empty-state">
+            <i class="bi bi-briefcase"></i>
+            <p class="mb-0">No jobs saved for this company yet.</p>
+        </div>
+    {% endfor %}
+{% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { apiFetch } from "/static/js/api.js";
+        import { openCompanyForm } from "/static/js/forms.js";
+        import { confirmDialog, queueToast, showToast } from "/static/js/utils.js";
+
+        const company = {{ company_data | tojson }};
+
+        document.getElementById("editCompanyBtn").addEventListener("click", () => openCompanyForm(company));
+
+        document.getElementById("deleteCompanyBtn").addEventListener("click", async () => {
+          const confirmed = await confirmDialog(`Delete ${company.company_name}? This can't be undone.`, {
+            title: "Delete company?",
+          });
+          if (!confirmed) {
+            return;
+          }
+          try {
+            await apiFetch(`/api/companies/${encodeURIComponent(company.company_id)}`, { method: "DELETE" });
+            queueToast("Company deleted");
+            window.location.href = "/companies";
+          } catch (error) {
+            // e.g. 409 "Company has related jobs and cannot be deleted"
+            showToast(error.message, "danger");
+          }
+        });
+    </script>
+{% endblock scripts %}

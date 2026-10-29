@@ -1,0 +1,275 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import fmt_date, salary, experience, deadline_badge with context %}
+{% block content %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small">
+            <li class="breadcrumb-item"><a href="{{ url_for('jobs_page') }}">Jobs</a></li>
+            <li class="breadcrumb-item active text-truncate" aria-current="page">{{ job.role }}</li>
+        </ol>
+    </nav>
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <!-- Header -->
+            <section class="content-section p-4 mb-4">
+                <div class="d-flex flex-column flex-sm-row gap-3">
+                    <span class="company-logo lg" aria-hidden="true">{{ job.company.company_name[:1] | upper }}</span>
+                    <div class="flex-grow-1">
+                        <h1 class="h3 mb-1">{{ job.role }}</h1>
+                        <a class="fw-semibold" href="{{ url_for('company_page', company_id=job.company_id) }}">{{ job.company.company_name }}</a>
+                        <div class="job-meta mt-2">
+                            <span><i class="bi bi-calendar3"></i>Posted {{ fmt_date(job.job_posting_date) }}</span>
+                            {{ deadline_badge(job.application_deadline, today) }}
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    {% if job.job_url.lower().startswith(("http://", "https://")) %}
+                        <a class="btn btn-primary" href="{{ job.job_url }}" target="_blank" rel="noopener noreferrer">
+                            View posting <i class="bi bi-box-arrow-up-right ms-1"></i>
+                        </a>
+                    {% endif %}
+                    <button type="button" class="btn btn-outline-secondary d-none" id="editJobBtn" data-logged-in-only>
+                        <i class="bi bi-pencil"></i> Edit
+                    </button>
+                    <button type="button" class="btn btn-outline-danger d-none" id="deleteJobBtn" data-logged-in-only>
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </div>
+            </section>
+            <!-- Details -->
+            {% set job_salary = salary(job) %}
+            {% set job_experience = experience(job) %}
+            <section class="content-section p-4 mb-4">
+                <h2 class="section-title">Details</h2>
+                <dl class="detail-list">
+                    <dt>Salary</dt>
+                    <dd>{{ job_salary or "Not listed" }}</dd>
+                    <dt>Experience</dt>
+                    <dd>{{ job_experience or "Not listed" }}</dd>
+                    {% if job.locations %}
+                        <dt>Location</dt>
+                        <dd>{{ job.locations | map(attribute="name") | join(", ") }}</dd>
+                    {% endif %}
+                    {% if job.work_modes %}
+                        <dt>Work mode</dt>
+                        <dd>{{ job.work_modes | map(attribute="name") | join(", ") }}</dd>
+                    {% endif %}
+                    {% if job.sources %}
+                        <dt>Found on</dt>
+                        <dd>{{ job.sources | map(attribute="source_name") | join(", ") }}</dd>
+                    {% endif %}
+                    {% if job.application_deadline %}
+                        <dt>Apply by</dt>
+                        <dd>{{ fmt_date(job.application_deadline) }}</dd>
+                    {% endif %}
+                    <dt>Job ID</dt>
+                    <dd><code>{{ job.job_id }}</code></dd>
+                </dl>
+            </section>
+            <!-- Skills and education (only when the job has them) -->
+            {% set required_skills = job.job_skills | selectattr("skill_type", "ne", "preferred") | list %}
+            {% set preferred_skills = job.job_skills | selectattr("skill_type", "eq", "preferred") | list %}
+            {% if job.job_skills or job.job_educations %}
+                <section class="content-section p-4 mb-4">
+                    {% if required_skills %}
+                        <h2 class="section-title">Required skills</h2>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            {% for job_skill in required_skills %}
+                                <span class="badge rounded-pill text-bg-primary fw-medium">{{ job_skill.skill.skill_name }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if preferred_skills %}
+                        <h2 class="section-title">Nice to have</h2>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            {% for job_skill in preferred_skills %}
+                                <span class="badge rounded-pill bg-body-secondary text-body fw-medium">{{ job_skill.skill.skill_name }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if job.job_educations %}
+                        <h2 class="section-title">Education</h2>
+                        <ul class="mb-0">
+                            {% for job_education in job.job_educations %}
+                                <li>
+                                    {{ job_education.education_requirement.education_name }}
+                                    {% if job_education.ed_req_txt %}<span class="text-muted-soft">— {{ job_education.ed_req_txt }}</span>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </section>
+            {% endif %}
+            <!-- Job description -->
+            <section class="content-section p-4 mb-4">
+                <h2 class="section-title">Job description</h2>
+                <div class="job-description">{{ job.JD }}</div>
+            </section>
+        </div>
+        <!-- Your application (filled in by JavaScript, because it needs the login token) -->
+        <div class="col-lg-4">
+            <aside class="content-section p-4 position-sticky" style="top: calc(var(--navbar-height) + 1.5rem)">
+                <h2 class="section-title">Your application</h2>
+                <div id="applicationBox">
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-8"></span>
+                        <span class="placeholder col-5"></span>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+    <!-- Track / update application modal -->
+    <div class="modal fade" id="applicationModal" tabindex="-1" aria-labelledby="applicationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="applicationForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="applicationModalLabel">Track application</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger form-error d-none" role="alert"></div>
+                        <p class="text-muted-soft">{{ job.role }} at {{ job.company.company_name }}</p>
+                        <div class="mb-3">
+                            <label for="dateApplied" class="form-label">Date applied</label>
+                            <input type="date" class="form-control" id="dateApplied" name="date_applied" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="applicationStatus" class="form-label">Status</label>
+                            <select class="form-select" id="applicationStatus" name="current_status"></select>
+                        </div>
+                        <div class="mb-1">
+                            <label for="interviewRounds" class="form-label">Interview rounds so far</label>
+                            <input type="number" class="form-control" id="interviewRounds" name="interview_rounds" min="0" value="0" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { apiFetch, fetchAllPages, getCurrentUser } from "/static/js/api.js";
+        import { openJobForm } from "/static/js/forms.js";
+        import {
+          STATUSES,
+          confirmDialog,
+          escapeHtml,
+          formatDate,
+          hideModal,
+          queueToast,
+          setButtonLoading,
+          showModal,
+          showToast,
+          statusBadge,
+          todayISO,
+        } from "/static/js/utils.js";
+
+        const job = {{ job_data | tojson }};
+        const jobPath = `/api/jobs/${encodeURIComponent(job.job_id)}`;
+
+        const applicationBox = document.getElementById("applicationBox");
+        const applicationForm = document.getElementById("applicationForm");
+        const formError = applicationForm.querySelector(".form-error");
+        let application = null;
+
+        applicationForm.current_status.innerHTML = STATUSES.map((status) => `<option>${status}</option>`).join("");
+
+        function renderApplication() {
+          if (!application) {
+            applicationBox.innerHTML = `
+              <p class="text-muted-soft">You haven't tracked an application for this job yet.</p>
+              <button type="button" class="btn btn-primary w-100" id="trackBtn"><i class="bi bi-check2-circle me-1"></i>I applied</button>`;
+            document.getElementById("trackBtn").addEventListener("click", openApplicationForm);
+            return;
+          }
+          applicationBox.innerHTML = `
+            <div class="mb-3">${statusBadge(application.current_status)}</div>
+            <dl class="detail-list mb-3">
+              <dt>Applied</dt><dd>${formatDate(application.date_applied)}</dd>
+              <dt>Interviews</dt><dd>${application.interview_rounds} round${application.interview_rounds === 1 ? "" : "s"}</dd>
+            </dl>
+            <div class="d-grid gap-2">
+              <button type="button" class="btn btn-outline-primary" id="updateBtn"><i class="bi bi-pencil me-1"></i>Update</button>
+              <a class="btn btn-link" href="/">Open dashboard</a>
+            </div>`;
+          document.getElementById("updateBtn").addEventListener("click", openApplicationForm);
+        }
+
+        function openApplicationForm() {
+          formError.classList.add("d-none");
+          applicationForm.date_applied.value = application?.date_applied ?? todayISO();
+          applicationForm.current_status.value = application?.current_status ?? "Applied";
+          applicationForm.interview_rounds.value = application?.interview_rounds ?? 0;
+          document.getElementById("applicationModalLabel").textContent = application ? "Update application" : "Track application";
+          showModal("applicationModal");
+        }
+
+        applicationForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const submitButton = applicationForm.querySelector("[type=submit]");
+          const data = {
+            date_applied: applicationForm.date_applied.value,
+            current_status: applicationForm.current_status.value,
+            interview_rounds: Number(applicationForm.interview_rounds.value),
+          };
+          setButtonLoading(submitButton, true);
+          try {
+            if (application) {
+              application = await apiFetch(`/api/applications/${application.application_id}`, { method: "PATCH", body: data });
+              showToast("Application updated");
+            } else {
+              application = await apiFetch("/api/applications", { method: "POST", body: { job_id: job.job_id, ...data } });
+              showToast("Application tracked. Good luck!");
+            }
+            hideModal("applicationModal");
+            renderApplication();
+          } catch (error) {
+            formError.textContent = error.message;
+            formError.classList.remove("d-none");
+          } finally {
+            setButtonLoading(submitButton, false);
+          }
+        });
+
+        document.getElementById("editJobBtn").addEventListener("click", () => openJobForm(job));
+
+        document.getElementById("deleteJobBtn").addEventListener("click", async () => {
+          const confirmed = await confirmDialog(`Delete "${job.role}"? This can't be undone.`, { title: "Delete job?" });
+          if (!confirmed) {
+            return;
+          }
+          try {
+            await apiFetch(jobPath, { method: "DELETE" });
+            queueToast("Job deleted");
+            window.location.href = "/jobs";
+          } catch (error) {
+            showToast(error.message, "danger");
+          }
+        });
+
+        // The application box depends on who is logged in.
+        const user = await getCurrentUser();
+        if (!user) {
+          const next = encodeURIComponent(window.location.pathname);
+          applicationBox.innerHTML = `
+            <p class="text-muted-soft">Log in to track your application for this job.</p>
+            <a class="btn btn-primary w-100" href="/login?next=${next}">Log in</a>`;
+        } else {
+          try {
+            // There's no "my application for job X" endpoint, so look through the user's applications.
+            const applications = await fetchAllPages("/api/applications", "applications");
+            application = applications.find((item) => item.job_id === job.job_id) ?? null;
+            renderApplication();
+          } catch (error) {
+            applicationBox.innerHTML = `<p class="text-danger mb-0">${escapeHtml(error.message)}</p>`;
+          }
+        }
+    </script>
+{% endblock scripts %}

@@ -1,1 +1,0 @@
-CREATE DATABASE job_application_tracker;

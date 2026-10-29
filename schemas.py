@@ -123,6 +123,7 @@ class ApplicationBase(BaseModel):
     job_id: str = Field(min_length=1, max_length=100)
     date_applied: date | None = None
     current_status: ApplicationStatus | None = None
+    interview_rounds: int = Field(default=0, ge=0)
 
 
 class ApplicationCreate(ApplicationBase):
@@ -140,12 +141,14 @@ class ApplicationReplace(BaseModel):
     job_id: str = Field(min_length=1, max_length=100)
     date_applied: date
     current_status: ApplicationStatus | None = None
+    interview_rounds: int = Field(default=0, ge=0)
 
 
 class ApplicationUpdate(BaseModel):
     job_id: str = Field(default=None, min_length=1, max_length=100)
     date_applied: date = None
     current_status: ApplicationStatus | None = None
+    interview_rounds: int = Field(default=None, ge=0)
 
 
 class PaginatedApplicationsResponse(BaseModel):
@@ -185,6 +188,24 @@ class UserPrivate(UserPublic):
 class UserUpdate(BaseModel):
     username: str = Field(default=None, min_length=1, max_length=50)
     email: EmailStr = Field(default=None, max_length=255)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr = Field(max_length=255)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 
 class Token(BaseModel):

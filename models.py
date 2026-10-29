@@ -1,9 +1,22 @@
 """SQLAlchemy ORM models for the job application tracker schema."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CHAR, DECIMAL, CheckConstraint, Date, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import (
+    CHAR,
+    DECIMAL,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -27,13 +40,14 @@ class Company(Base):
 class Job(Base):
     __tablename__ = "job"
     __table_args__ = (
-        CheckConstraint("application_deadline >= job_posting_date"),
-        CheckConstraint("exp_min >= 0"),
-        CheckConstraint("exp_max >= 0"),
-        CheckConstraint("exp_max >= exp_min"),
-        CheckConstraint("salary_min >= 0"),
-        CheckConstraint("salary_max >= 0"),
-        CheckConstraint("salary_max >= salary_min"),
+        # Named to match the names PostgreSQL gave them, so Alembic autogenerate can match them up.
+        CheckConstraint("application_deadline >= job_posting_date", name="job_check"),
+        CheckConstraint("exp_min >= 0", name="job_exp_min_check"),
+        CheckConstraint("exp_max >= 0", name="job_exp_max_check"),
+        CheckConstraint("exp_max >= exp_min", name="job_check1"),
+        CheckConstraint("salary_min >= 0", name="job_salary_min_check"),
+        CheckConstraint("salary_max >= 0", name="job_salary_max_check"),
+        CheckConstraint("salary_max >= salary_min", name="job_check2"),
         Index("ix_job_role", "role"),
         Index("ix_job_job_posting_date", "job_posting_date"),
         Index("ix_job_application_deadline", "application_deadline"),
@@ -87,7 +101,8 @@ class Application(Base):
     __table_args__ = (
         CheckConstraint(
             "current_status IN ('Applied', 'Screening', 'Interview', 'Rejected', "
-            "'Offer', 'Accepted', 'Withdrawn')"
+            "'Offer', 'Accepted', 'Withdrawn')",
+            name="application_current_status_check",
         ),
         UniqueConstraint("user_id", "job_id"),
         Index("ix_application_date_applied", "date_applied"),
@@ -100,6 +115,9 @@ class Application(Base):
     current_status: Mapped[str | None] = mapped_column(
         String(30), nullable=True, server_default=text("'Applied'")
     )
+    # default= is used for new rows made in Python; server_default= lets the database fill in 0
+    # for applications that already exist when the migration adds this column.
+    interview_rounds: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     job: Mapped["Job"] = relationship(back_populates="applications")
     user: Mapped["User"] = relationship(back_populates="applications")
@@ -115,12 +133,26 @@ class User(Base):
     image_file: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     applications: Mapped[list["Application"]] = relationship(back_populates="user", passive_deletes=True)
+    reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", passive_deletes=True)
 
     @property
     def image_path(self) -> str | None:
         """URL of the profile picture, or None if the user hasn't uploaded one."""
 
         return f"/media/profile_pics/{self.image_file}" if self.image_file else None
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Only the SHA-256 hash is stored, so a leaked database can't be used to reset passwords.
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    user: Mapped["User"] = relationship(back_populates="reset_tokens")
 
 
 class Location(Base):
@@ -214,7 +246,7 @@ class JobWorkMode(Base):
 class JobSkill(Base):
     __tablename__ = "job_skill"
     __table_args__ = (
-        CheckConstraint("skill_type IN ('required', 'preferred')"),
+        CheckConstraint("skill_type IN ('required', 'preferred')", name="job_skill_skill_type_check"),
         Index("ix_job_skill_skill_id", "skill_id"),
     )
 

@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h1>Companies</h1>
+            <p class="text-muted-soft mb-0">{{ total }} compan{{ "ies" if total != 1 else "y" }}, A to Z</p>
+        </div>
+        <button type="button" class="btn btn-primary d-none" data-open-form="company" data-logged-in-only>
+            <i class="bi bi-plus-lg"></i> New company
+        </button>
+    </div>
+    <div class="row g-3 mb-4" id="companiesContainer">
+        {% for company in companies %}
+            <div class="col-md-6 col-xl-4">
+                <a class="content-section card-link-hover d-flex gap-3 p-3 h-100 text-body"
+                   href="{{ url_for('company_page', company_id=company.company_id) }}">
+                    <span class="company-logo" aria-hidden="true">{{ company.company_name[:1] | upper }}</span>
+                    <div class="min-w-0">
+                        <div class="job-title">{{ company.company_name }}</div>
+                        {% if company.company_description %}
+                            <p class="text-muted-soft small mb-0 line-clamp-2">{{ company.company_description }}</p>
+                        {% endif %}
+                    </div>
+                </a>
+            </div>
+        {% else %}
+            <div class="col-12">
+                <div class="content-section empty-state">
+                    <i class="bi bi-building"></i>
+                    <p class="mb-0">No companies yet. Log in and use <strong>Add → New company</strong> to add one.</p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% if has_more %}
+        <div class="text-center mb-4">
+            <button type="button" class="btn btn-outline-primary" id="loadMoreBtn">Load more companies</button>
+        </div>
+    {% endif %}
+{% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { apiFetch } from "/static/js/api.js";
+        import { escapeHtml, initial, setButtonLoading, showToast } from "/static/js/utils.js";
+
+        let currentOffset = {{ limit }};
+        const limit = {{ limit }};
+
+        const companiesContainer = document.getElementById("companiesContainer");
+        const loadMoreBtn = document.getElementById("loadMoreBtn");
+
+        function createCompanyHTML(company) {
+          const description = company.company_description
+            ? `<p class="text-muted-soft small mb-0 line-clamp-2">${escapeHtml(company.company_description)}</p>`
+            : "";
+          return `
+            <div class="col-md-6 col-xl-4">
+              <a class="content-section card-link-hover d-flex gap-3 p-3 h-100 text-body"
+                 href="/companies/${encodeURIComponent(company.company_id)}">
+                <span class="company-logo" aria-hidden="true">${initial(company.company_name)}</span>
+                <div class="min-w-0">
+                  <div class="job-title">${escapeHtml(company.company_name)}</div>
+                  ${description}
+                </div>
+              </a>
+            </div>`;
+        }
+
+        async function loadMoreCompanies() {
+          setButtonLoading(loadMoreBtn, true, "Loading...");
+          try {
+            const data = await apiFetch(`/api/companies?skip=${currentOffset}&limit=${limit}`);
+            for (const company of data.companies) {
+              companiesContainer.insertAdjacentHTML("beforeend", createCompanyHTML(company));
+            }
+            currentOffset += data.companies.length;
+            setButtonLoading(loadMoreBtn, false);
+            if (!data.has_more) {
+              loadMoreBtn.remove();
+            }
+          } catch (error) {
+            setButtonLoading(loadMoreBtn, false);
+            showToast(error.message, "danger");
+          }
+        }
+
+        loadMoreBtn?.addEventListener("click", loadMoreCompanies);
+    </script>
+{% endblock scripts %}

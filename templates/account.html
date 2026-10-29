@@ -1,0 +1,239 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="mx-auto" style="max-width: 46rem">
+        <div class="page-header">
+            <div>
+                <h1>Account</h1>
+                <p class="text-muted-soft mb-0">Manage your profile, picture and password.</p>
+            </div>
+            <button type="button" class="btn btn-outline-secondary" id="logoutBtn">
+                <i class="bi bi-box-arrow-right me-1"></i>Log out
+            </button>
+        </div>
+        <!-- Profile picture -->
+        <section class="content-section p-4 mb-4">
+            <h2 class="section-title">Profile picture</h2>
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-4">
+                <div id="avatarPreview"></div>
+                <div class="flex-grow-1">
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <label class="btn btn-outline-primary mb-0" for="pictureInput">
+                            <i class="bi bi-upload me-1"></i>Choose image
+                        </label>
+                        <input type="file" class="d-none" id="pictureInput" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <button type="button" class="btn btn-primary d-none" id="uploadPictureBtn">Save picture</button>
+                        <button type="button" class="btn btn-outline-danger d-none" id="removePictureBtn">Remove</button>
+                    </div>
+                    <small class="text-muted-soft">JPEG, PNG, GIF or WebP, up to 5 MB. It will be cropped to a square.</small>
+                </div>
+            </div>
+        </section>
+        <!-- Profile details -->
+        <section class="content-section p-4 mb-4">
+            <h2 class="section-title">Profile</h2>
+            <form id="updateProfileForm">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required maxlength="50" autocomplete="username">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required maxlength="255" autocomplete="email">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Save profile</button>
+            </form>
+        </section>
+        <!-- Change password -->
+        <section class="content-section p-4 mb-4">
+            <h2 class="section-title">Change password</h2>
+            <form id="changePasswordForm">
+                <div class="mb-3">
+                    <label for="currentPassword" class="form-label">Current password</label>
+                    <input type="password" class="form-control" id="currentPassword" required autocomplete="current-password">
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="newPassword" class="form-label">New password</label>
+                        <input type="password" class="form-control" id="newPassword" required minlength="8" maxlength="128" autocomplete="new-password">
+                        <div class="form-text">At least 8 characters.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="confirmNewPassword" class="form-label">Confirm new password</label>
+                        <input type="password" class="form-control" id="confirmNewPassword" required minlength="8" autocomplete="new-password">
+                        <div class="invalid-feedback">Passwords do not match.</div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Change password</button>
+            </form>
+        </section>
+        <!-- Danger zone -->
+        <section class="content-section p-4 mb-4 border-danger-subtle">
+            <h2 class="section-title text-danger">Danger zone</h2>
+            <p class="text-muted-soft">
+                Deleting your account also deletes all of your tracked applications. Jobs and companies stay, since everyone shares them.
+            </p>
+            <button type="button" class="btn btn-outline-danger" id="deleteAccountBtn">Delete my account</button>
+        </section>
+    </div>
+{% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { apiFetch, clearToken, logout, requireUser } from "/static/js/api.js";
+        import { avatarHtml, confirmDialog, queueToast, setButtonLoading, showToast } from "/static/js/utils.js";
+
+        const avatarPreview = document.getElementById("avatarPreview");
+        const pictureInput = document.getElementById("pictureInput");
+        const uploadBtn = document.getElementById("uploadPictureBtn");
+        const removeBtn = document.getElementById("removePictureBtn");
+        const profileForm = document.getElementById("updateProfileForm");
+        const passwordForm = document.getElementById("changePasswordForm");
+
+        let user = null;
+
+        // Show the user's details everywhere on the page, including the navbar.
+        function renderUser() {
+          avatarPreview.innerHTML = avatarHtml(user, 96);
+          removeBtn.classList.toggle("d-none", !user.image_path);
+          uploadBtn.classList.add("d-none");
+          profileForm.username.value = user.username;
+          profileForm.email.value = user.email;
+          document.getElementById("navUsername").textContent = user.username;
+          document.getElementById("navAvatar").innerHTML = avatarHtml(user, 28);
+        }
+
+        // Preview the chosen picture before uploading it.
+        pictureInput.addEventListener("change", () => {
+          const file = pictureInput.files[0];
+          if (!file) {
+            return;
+          }
+          if (file.size > 5 * 1024 * 1024) {
+            showToast("That image is larger than 5 MB.", "danger");
+            pictureInput.value = "";
+            return;
+          }
+          const previewUrl = URL.createObjectURL(file);
+          avatarPreview.innerHTML = `<img class="avatar" src="${previewUrl}" alt="New picture preview" width="96" height="96">`;
+          uploadBtn.classList.remove("d-none");
+        });
+
+        uploadBtn.addEventListener("click", async () => {
+          const formData = new FormData();
+          formData.append("file", pictureInput.files[0]);
+          setButtonLoading(uploadBtn, true, "Uploading...");
+          try {
+            // FormData is sent as multipart/form-data; the browser sets that header itself.
+            user = await apiFetch("/api/users/me/picture", { method: "PATCH", body: formData });
+            showToast("Profile picture updated");
+          } catch (error) {
+            showToast(error.message, "danger");
+          } finally {
+            pictureInput.value = "";
+            setButtonLoading(uploadBtn, false);
+            renderUser();
+          }
+        });
+
+        removeBtn.addEventListener("click", async () => {
+          const confirmed = await confirmDialog("Remove your profile picture?", { title: "Remove picture?", confirmText: "Remove" });
+          if (!confirmed) {
+            return;
+          }
+          try {
+            user = await apiFetch("/api/users/me/picture", { method: "DELETE" });
+            showToast("Profile picture removed");
+            renderUser();
+          } catch (error) {
+            showToast(error.message, "danger");
+          }
+        });
+
+        profileForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const submitButton = profileForm.querySelector("[type=submit]");
+          // PATCH only what changed, so an unchanged username isn't checked against itself.
+          const changes = {};
+          const username = profileForm.username.value.trim();
+          const email = profileForm.email.value.trim();
+          if (username !== user.username) changes.username = username;
+          if (email.toLowerCase() !== user.email) changes.email = email;
+          if (Object.keys(changes).length === 0) {
+            showToast("Nothing to save, no changes made.", "info");
+            return;
+          }
+          setButtonLoading(submitButton, true);
+          try {
+            user = await apiFetch("/api/users/me", { method: "PATCH", body: changes });
+            showToast("Profile saved");
+            renderUser();
+          } catch (error) {
+            showToast(error.message, "danger");
+          } finally {
+            setButtonLoading(submitButton, false);
+          }
+        });
+
+        const newPasswordInput = document.getElementById("newPassword");
+        const confirmInput = document.getElementById("confirmNewPassword");
+
+        function checkPasswordsMatch() {
+          const matches = newPasswordInput.value === confirmInput.value;
+          confirmInput.setCustomValidity(matches ? "" : "Passwords do not match");
+          confirmInput.classList.toggle("is-invalid", !matches && confirmInput.value !== "");
+          return matches;
+        }
+        newPasswordInput.addEventListener("input", checkPasswordsMatch);
+        confirmInput.addEventListener("input", checkPasswordsMatch);
+
+        passwordForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (!checkPasswordsMatch()) {
+            return;
+          }
+          const submitButton = passwordForm.querySelector("[type=submit]");
+          setButtonLoading(submitButton, true, "Changing...");
+          try {
+            const data = await apiFetch("/api/users/me/password", {
+              method: "PATCH",
+              body: {
+                current_password: document.getElementById("currentPassword").value,
+                new_password: newPasswordInput.value,
+              },
+            });
+            passwordForm.reset();
+            showToast(data.message);
+          } catch (error) {
+            showToast(error.message, "danger");
+          } finally {
+            setButtonLoading(submitButton, false);
+          }
+        });
+
+        document.getElementById("logoutBtn").addEventListener("click", logout);
+
+        document.getElementById("deleteAccountBtn").addEventListener("click", async () => {
+          const confirmed = await confirmDialog(
+            "This permanently deletes your account and all of your tracked applications. This can't be undone.",
+            { title: "Delete your account?", confirmText: "Delete account" },
+          );
+          if (!confirmed) {
+            return;
+          }
+          try {
+            await apiFetch("/api/users/me", { method: "DELETE" });
+            clearToken();
+            queueToast("Your account has been deleted.", "info");
+            window.location.href = "/";
+          } catch (error) {
+            showToast(error.message, "danger");
+          }
+        });
+
+        user = await requireUser();
+        if (user) {
+          renderUser();
+        }
+    </script>
+{% endblock scripts %}

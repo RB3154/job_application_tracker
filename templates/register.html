@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="content-section auth-card">
+        <h1 class="h3 mb-1">Create your account</h1>
+        <p class="text-muted-soft mb-4">Start tracking your job search in a minute.</p>
+        <div class="alert alert-danger form-error d-none" role="alert"></div>
+        <form id="registerForm">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required maxlength="50" autocomplete="username" autofocus>
+            </div>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" name="email" required maxlength="255" autocomplete="email">
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required minlength="8" maxlength="128" autocomplete="new-password">
+                <div class="form-text">At least 8 characters.</div>
+            </div>
+            <div class="mb-3">
+                <label for="confirmPassword" class="form-label">Confirm password</label>
+                <input type="password" class="form-control" id="confirmPassword" required minlength="8" autocomplete="new-password">
+                <div class="invalid-feedback">Passwords do not match.</div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Create account</button>
+        </form>
+        <p class="text-center text-muted-soft mt-4 mb-0">
+            Already have an account? <a href="{{ url_for('login_page') }}">Log in</a>
+        </p>
+    </div>
+{% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { apiFetch, setToken } from "/static/js/api.js";
+        import { queueToast, setButtonLoading } from "/static/js/utils.js";
+
+        const registerForm = document.getElementById("registerForm");
+        const passwordInput = document.getElementById("password");
+        const confirmInput = document.getElementById("confirmPassword");
+        const formError = document.querySelector(".form-error");
+
+        function checkPasswordsMatch() {
+          const matches = passwordInput.value === confirmInput.value;
+          confirmInput.setCustomValidity(matches ? "" : "Passwords do not match");
+          confirmInput.classList.toggle("is-invalid", !matches && confirmInput.value !== "");
+          return matches;
+        }
+        passwordInput.addEventListener("input", checkPasswordsMatch);
+        confirmInput.addEventListener("input", checkPasswordsMatch);
+
+        registerForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (!checkPasswordsMatch()) {
+            return;
+          }
+          const submitButton = registerForm.querySelector("[type=submit]");
+          formError.classList.add("d-none");
+          setButtonLoading(submitButton, true, "Creating account...");
+
+          const userData = {
+            username: registerForm.username.value.trim(),
+            email: registerForm.email.value.trim(),
+            password: passwordInput.value,
+          };
+
+          try {
+            await apiFetch("/api/users", { method: "POST", body: userData });
+
+            // Log the new user straight in, instead of making them type the same details again.
+            const loginData = new FormData();
+            loginData.append("username", userData.email);
+            loginData.append("password", userData.password);
+            const token = await apiFetch("/api/users/token", { method: "POST", body: loginData });
+            setToken(token.access_token);
+
+            queueToast(`Welcome, ${userData.username}! Your account is ready.`);
+            window.location.href = "/";
+          } catch (error) {
+            formError.textContent = error.message;
+            formError.classList.remove("d-none");
+            setButtonLoading(submitButton, false);
+          }
+        });
+    </script>
+{% endblock scripts %}

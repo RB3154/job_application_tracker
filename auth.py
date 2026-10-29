@@ -1,5 +1,7 @@
-"""Password hashing, JWT access tokens and the current-user dependency."""
+"""Password hashing, JWT access tokens, password reset tokens and the current-user dependency."""
 
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -25,6 +27,22 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return password_hash.verify(plain_password, hashed_password)
+
+
+def generate_reset_token() -> str:
+    """Create a random, URL-safe token that is emailed to the user."""
+
+    return secrets.token_urlsafe(32)
+
+
+def hash_reset_token(token: str) -> str:
+    """Hash a reset token for storing/looking up in the database.
+
+    SHA-256 (not argon2) is fine here: the token is long and random, so it can't be guessed,
+    and a fast hash lets us find the row with a simple WHERE token_hash = ... query.
+    """
+
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:

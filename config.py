@@ -16,5 +16,18 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = 5 * 1024 * 1024
     items_per_page: int = 10
 
+    reset_token_expire_minutes: int = 60
+
+    # SMTP server used to send emails (e.g. a Mailtrap sandbox while developing).
+    mail_server: str = "localhost"
+    mail_port: int = 587
+    mail_username: str = ""
+    mail_password: SecretStr = SecretStr("")
+    mail_from: str = "noreply@example.com"
+    mail_use_tls: bool = True
+
+    # Base URL of the site, used to build the reset link that opens the /reset-password page.
+    frontend_url: str = "http://localhost:8000"
+
 
 settings = Settings()

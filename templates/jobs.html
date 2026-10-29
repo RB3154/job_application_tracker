@@ -1,0 +1,92 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import job_card with context %}
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h1>Jobs</h1>
+            <p class="text-muted-soft mb-0">{{ total }} job{{ "s" if total != 1 }}, newest first</p>
+        </div>
+        <button type="button" class="btn btn-primary d-none" data-open-form="job" data-logged-in-only>
+            <i class="bi bi-plus-lg"></i> New job
+        </button>
+    </div>
+    <div id="jobsContainer">
+        {% for job in jobs %}
+            {{ job_card(job, today) }}
+        {% else %}
+            <div class="content-section empty-state">
+                <i class="bi bi-briefcase"></i>
+                <p class="mb-0">No jobs yet. Log in and use <strong>Add → New job</strong> to save the first one.</p>
+            </div>
+        {% endfor %}
+    </div>
+    {% if has_more %}
+        <div class="text-center mb-4">
+            <button type="button" class="btn btn-outline-primary" id="loadMoreBtn">Load more jobs</button>
+        </div>
+    {% endif %}
+{% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { apiFetch, getCompany } from "/static/js/api.js";
+        import { deadlineBadge, escapeHtml, formatDate, formatExperience, formatSalary, initial, setButtonLoading, showToast } from "/static/js/utils.js";
+
+        // Pagination state, starting after the jobs the server already rendered.
+        let currentOffset = {{ limit }};
+        const limit = {{ limit }};
+
+        const jobsContainer = document.getElementById("jobsContainer");
+        const loadMoreBtn = document.getElementById("loadMoreBtn");
+
+        // Same HTML as the job_card macro in _macros.html.
+        function createJobHTML(job, company) {
+          const companyName = company?.company_name ?? job.company_id;
+          const jobUrl = `/jobs/${encodeURIComponent(job.job_id)}`;
+          const companyUrl = `/companies/${encodeURIComponent(job.company_id)}`;
+          const salary = formatSalary(job);
+          const experience = formatExperience(job);
+          return `
+            <article class="content-section card-link-hover p-3 p-md-4 mb-3">
+              <div class="d-flex gap-3">
+                <span class="company-logo" aria-hidden="true">${initial(companyName)}</span>
+                <div class="flex-grow-1 min-w-0">
+                  <div class="d-flex flex-wrap justify-content-between gap-2">
+                    <div>
+                      <a class="job-title" href="${jobUrl}">${escapeHtml(job.role)}</a>
+                      <div><a class="text-body" href="${companyUrl}">${escapeHtml(companyName)}</a></div>
+                    </div>
+                    <div>${deadlineBadge(job.application_deadline)}</div>
+                  </div>
+                  <div class="job-meta mt-2">
+                    <span><i class="bi bi-calendar3"></i>Posted ${formatDate(job.job_posting_date)}</span>
+                    ${salary ? `<span><i class="bi bi-cash-stack"></i>${escapeHtml(salary)}</span>` : ""}
+                    ${experience ? `<span><i class="bi bi-bar-chart"></i>${escapeHtml(experience)}</span>` : ""}
+                  </div>
+                </div>
+              </div>
+            </article>`;
+        }
+
+        async function loadMoreJobs() {
+          setButtonLoading(loadMoreBtn, true, "Loading...");
+          try {
+            const data = await apiFetch(`/api/jobs?skip=${currentOffset}&limit=${limit}`);
+            // The API only gives company_id, so look up each company's name (cached in api.js).
+            const companies = await Promise.all(data.jobs.map((job) => getCompany(job.company_id)));
+            data.jobs.forEach((job, index) => {
+              jobsContainer.insertAdjacentHTML("beforeend", createJobHTML(job, companies[index]));
+            });
+            currentOffset += data.jobs.length;
+            setButtonLoading(loadMoreBtn, false);
+            if (!data.has_more) {
+              loadMoreBtn.remove();
+            }
+          } catch (error) {
+            setButtonLoading(loadMoreBtn, false);
+            showToast(error.message, "danger");
+          }
+        }
+
+        loadMoreBtn?.addEventListener("click", loadMoreJobs);
+    </script>
+{% endblock scripts %}

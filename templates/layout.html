@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        {% if title %}
+            <title>{{ title }} · Job Tracker</title>
+        {% else %}
+            <title>Job Tracker</title>
+        {% endif %}
+        <meta name="description" content="Track your job applications from applied to offer.">
+        <!-- Apply the saved theme before anything is drawn, so dark mode doesn't flash white on page load. -->
+        <script>
+            (() => {
+                let theme = "auto";
+                try { theme = localStorage.getItem("theme") || "auto"; } catch {}
+                if (theme === "auto") {
+                    theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                }
+                document.documentElement.setAttribute("data-bs-theme", theme);
+            })();
+        </script>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+              rel="stylesheet">
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+              rel="stylesheet"
+              integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+              crossorigin="anonymous">
+        <!-- Bootstrap Icons: <i class="bi bi-briefcase"></i> -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+              rel="stylesheet">
+        <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+        <meta name="theme-color" content="#4f5bd5">
+        <link rel="icon" href="{{ url_for('static', path='icons/icon.svg') }}" type="image/svg+xml">
+    </head>
+    <body class="d-flex flex-column min-vh-100">
+        {% set path = request.url.path %}
+        <header>
+            <nav class="navbar navbar-expand-md site-navbar fixed-top">
+                <div class="container">
+                    <a class="navbar-brand me-4" href="{{ url_for('home') }}">
+                        <span class="brand-mark"><i class="bi bi-briefcase-fill"></i></span>
+                        Job Tracker
+                    </a>
+                    <button class="navbar-toggler"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#navbarToggle"
+                            aria-controls="navbarToggle"
+                            aria-expanded="false"
+                            aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarToggle">
+                        <div class="navbar-nav me-auto gap-md-1">
+                            <a class="nav-link {% if path == '/' %}active{% endif %}"
+                               {% if path == '/' %}aria-current="page"{% endif %}
+                               href="{{ url_for('home') }}">Dashboard</a>
+                            <a class="nav-link {% if path.startswith('/jobs') %}active{% endif %}"
+                               {% if path.startswith('/jobs') %}aria-current="page"{% endif %}
+                               href="{{ url_for('jobs_page') }}">Jobs</a>
+                            <a class="nav-link {% if path.startswith('/companies') %}active{% endif %}"
+                               {% if path.startswith('/companies') %}aria-current="page"{% endif %}
+                               href="{{ url_for('companies_page') }}">Companies</a>
+                        </div>
+                        <div class="navbar-nav align-items-md-center gap-2 py-2 py-md-0">
+                            <!-- Shown when logged in (JavaScript removes d-none) -->
+                            <div id="loggedInNav" class="d-none align-items-md-center gap-2 flex-column flex-md-row">
+                                <div class="dropdown">
+                                    <button class="btn btn-primary btn-sm dropdown-toggle"
+                                            type="button"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false">
+                                        <i class="bi bi-plus-lg"></i> Add
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-md-end">
+                                        <li>
+                                            <button class="dropdown-item" type="button" data-open-form="job">
+                                                <i class="bi bi-briefcase me-2"></i>New job
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="dropdown-item" type="button" data-open-form="company">
+                                                <i class="bi bi-building me-2"></i>New company
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <a class="nav-link d-flex align-items-center gap-2 {% if path == '/account' %}active{% endif %}"
+                                   href="{{ url_for('account_page') }}"
+                                   id="accountLink">
+                                    <span id="navAvatar"></span>
+                                    <span id="navUsername">Account</span>
+                                </a>
+                            </div>
+                            <!-- Shown when logged out -->
+                            <div id="loggedOutNav" class="d-flex gap-2">
+                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('login_page') }}">Log in</a>
+                                <a class="btn btn-primary btn-sm" href="{{ url_for('register_page') }}">Sign up</a>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-link nav-link px-2"
+                                        type="button"
+                                        id="themeToggle"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false"
+                                        aria-label="Change theme">
+                                    <i class="bi bi-circle-half" id="themeIcon"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="themeToggle">
+                                    <li>
+                                        <button class="dropdown-item" type="button" data-theme-value="light">
+                                            <i class="bi bi-sun me-2"></i>Light
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button class="dropdown-item" type="button" data-theme-value="dark">
+                                            <i class="bi bi-moon-stars me-2"></i>Dark
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button class="dropdown-item" type="button" data-theme-value="auto">
+                                            <i class="bi bi-circle-half me-2"></i>Auto
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </header>
+        <main class="container">
+            {% block content %}
+            {% endblock content %}
+        </main>
+        <footer class="mt-auto py-3 border-top">
+            <div class="container text-center">
+                <small class="text-muted-soft">Job Tracker · built with FastAPI · <a href="/docs">API docs</a></small>
+            </div>
+        </footer>
+        {% include "_form_modals.html" %}
+        <!-- Generic "Are you sure?" dialog, used through confirmDialog() in utils.js -->
+        <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title" id="confirmModalLabel">Are you sure?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="confirm-message mb-0"></p>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger confirm-btn">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+        <!-- Bootstrap Bundle with Popper -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+                integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+                crossorigin="anonymous"></script>
+        <!-- Dark Mode Toggle -->
+        <script>
+            (() => {
+                const icons = { light: "bi-sun", dark: "bi-moon-stars", auto: "bi-circle-half" };
+                const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+                const savedTheme = () => {
+                    try { return localStorage.getItem("theme") || "auto"; } catch { return "auto"; }
+                };
+
+                const applyTheme = (theme) => {
+                    const resolved = theme === "auto" ? (darkQuery.matches ? "dark" : "light") : theme;
+                    document.documentElement.setAttribute("data-bs-theme", resolved);
+                    document.getElementById("themeIcon").className = `bi ${icons[theme]}`;
+                };
+
+                document.querySelectorAll("[data-theme-value]").forEach((button) => {
+                    button.addEventListener("click", () => {
+                        const theme = button.dataset.themeValue;
+                        try { localStorage.setItem("theme", theme); } catch {}
+                        applyTheme(theme);
+                    });
+                });
+
+                // In "auto", follow the operating system when it switches between light and dark.
+                darkQuery.addEventListener("change", () => applyTheme(savedTheme()));
+                applyTheme(savedTheme());
+            })();
+        </script>
+        <!-- Navbar login state, the Add menu and toasts queued by the previous page -->
+        <script type="module">
+            import { getCurrentUser } from "/static/js/api.js";
+            import { openCompanyForm, openJobForm } from "/static/js/forms.js";
+            import { avatarHtml, showQueuedToast } from "/static/js/utils.js";
+
+            showQueuedToast();
+
+            // Any button with data-open-form="job" or "company" opens that form (data-company-id preselects a company).
+            document.querySelectorAll("[data-open-form]").forEach((button) => {
+                button.addEventListener("click", () => {
+                    if (button.dataset.openForm === "job") {
+                        openJobForm(null, { companyId: button.dataset.companyId });
+                    } else {
+                        openCompanyForm();
+                    }
+                });
+            });
+
+            const user = await getCurrentUser();
+            if (user) {
+                document.getElementById("loggedInNav").classList.replace("d-none", "d-flex");
+                document.getElementById("loggedOutNav").classList.replace("d-flex", "d-none");
+                document.getElementById("navUsername").textContent = user.username;
+                document.getElementById("navAvatar").innerHTML = avatarHtml(user, 28);
+                // Pages mark buttons that need a login (New job, Edit, Delete...) with data-logged-in-only.
+                document.querySelectorAll("[data-logged-in-only]").forEach((element) => element.classList.remove("d-none"));
+            }
+        </script>
+        {% block scripts %}
+        {% endblock scripts %}
+    </body>
+</html>

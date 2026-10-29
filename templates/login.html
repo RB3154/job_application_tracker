@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="content-section auth-card">
+        <h1 class="h3 mb-1">Welcome back</h1>
+        <p class="text-muted-soft mb-4">Log in to see your applications.</p>
+        <div class="alert alert-danger form-error d-none" role="alert"></div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <!-- name="username" because OAuth2PasswordRequestForm calls the field username; we put the email in it. -->
+                <input type="email" class="form-control" id="email" name="username" required autocomplete="email" autofocus>
+            </div>
+            <div class="mb-3">
+                <div class="d-flex justify-content-between">
+                    <label for="password" class="form-label">Password</label>
+                    <a class="small" href="{{ url_for('forgot_password_page') }}">Forgot password?</a>
+                </div>
+                <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Log in</button>
+        </form>
+        <p class="text-center text-muted-soft mt-4 mb-0">
+            New here? <a href="{{ url_for('register_page') }}">Create an account</a>
+        </p>
+    </div>
+{% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { ApiError, apiFetch, getCurrentUser, setToken } from "/static/js/api.js";
+        import { queueToast, setButtonLoading } from "/static/js/utils.js";
+
+        const loginForm = document.getElementById("loginForm");
+        const formError = document.querySelector(".form-error");
+
+        // Where to go after logging in: the page that sent us here (?next=/jobs/abc), or the dashboard.
+        // Only same-site paths are allowed, so a link like ?next=https://evil.example can't redirect away.
+        function nextPage() {
+          const next = new URLSearchParams(window.location.search).get("next");
+          return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+        }
+
+        // Already logged in? Skip the form.
+        if (await getCurrentUser()) {
+          window.location.replace(nextPage());
+        }
+
+        loginForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const submitButton = loginForm.querySelector("[type=submit]");
+          formError.classList.add("d-none");
+          setButtonLoading(submitButton, true, "Logging in...");
+
+          try {
+            // OAuth2PasswordRequestForm expects form data, not JSON, so send the FormData as-is.
+            const data = await apiFetch("/api/users/token", { method: "POST", body: new FormData(loginForm) });
+            setToken(data.access_token);
+            queueToast("Logged in. Welcome back!");
+            window.location.href = nextPage();
+          } catch (error) {
+            formError.textContent = error instanceof ApiError ? error.message : "Something went wrong.";
+            formError.classList.remove("d-none");
+            setButtonLoading(submitButton, false);
+          }
+        });
+    </script>
+{% endblock scripts %}
