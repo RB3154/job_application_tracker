@@ -40,6 +40,14 @@ class CompanyUpdate(BaseModel):
     company_description: str | None = None
 
 
+class PaginatedCompaniesResponse(BaseModel):
+    companies: list[CompanyResponse]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
+
+
 class JobBase(BaseModel):
     role: str = Field(min_length=1, max_length=255)
     JD: str = Field(min_length=1)
@@ -103,6 +111,14 @@ class JobUpdate(BaseModel):
         JobBase.model_validate(current_values | self.model_dump(exclude_unset=True))
 
 
+class PaginatedJobsResponse(BaseModel):
+    jobs: list[JobResponse]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
+
+
 class ApplicationBase(BaseModel):
     job_id: str = Field(min_length=1, max_length=100)
     date_applied: date | None = None
@@ -130,6 +146,14 @@ class ApplicationUpdate(BaseModel):
     job_id: str = Field(default=None, min_length=1, max_length=100)
     date_applied: date = None
     current_status: ApplicationStatus | None = None
+
+
+class PaginatedApplicationsResponse(BaseModel):
+    applications: list[ApplicationResponse]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
 
 
 class UserBase(BaseModel):

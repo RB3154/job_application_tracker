@@ -1,6 +1,6 @@
 """Tests for /api/applications."""
 
-from conftest import make_user
+from conftest import job_body, make_user, unique
 
 
 def create_application(client, headers, job_id) -> int:
@@ -23,7 +23,7 @@ def test_owner_can_manage_own_application(client, rudra, job):
     application_id = create_application(client, headers, job["job_id"])
     url = f"/api/applications/{application_id}"
 
-    listed = client.get("/api/applications", headers=headers).json()
+    listed = client.get("/api/applications", headers=headers).json()["applications"]
     assert application_id in [a["application_id"] for a in listed]
     assert client.get(url, headers=headers).status_code == 200
 
@@ -50,7 +50,7 @@ def test_other_user_cannot_access_application(client, rudra, aman, job):
     url = f"/api/applications/{application_id}"
 
     try:
-        aman_list = client.get("/api/applications", headers=aman_headers).json()
+        aman_list = client.get("/api/applications", headers=aman_headers).json()["applications"]
         assert application_id not in [a["application_id"] for a in aman_list]
 
         assert client.get(url, headers=aman_headers).status_code == 403
@@ -96,3 +96,40 @@ def test_deleting_user_deletes_their_applications(client, aman, job):
     # 404 (gone), not 403 (which would mean it still exists and belongs to someone else).
     _, aman_headers = aman
     assert client.get(f"/api/applications/{application_id}", headers=aman_headers).status_code == 404
+
+
+# The list comes back one page at a time: skip jumps over rows, limit caps how many come back.
+def test_applications_are_paginated(client, rudra, job):
+    _, rudra_headers = rudra
+    # A brand-new user, so we know they have exactly 3 applications.
+    _, headers = make_user(client, "pager")
+    job_ids = [job["job_id"]]
+
+    try:
+        for _ in range(2):
+            job_id = unique("job")
+            assert client.post("/api/jobs", json=job_body(job_id, job["company_id"]), headers=rudra_headers).status_code == 201
+            job_ids.append(job_id)
+        for job_id in job_ids:
+            create_application(client, headers, job_id)
+
+        page_1 = client.get("/api/applications?skip=0&limit=2", headers=headers).json()
+        assert len(page_1["applications"]) == 2
+        assert page_1["total"] == 3
+        assert page_1["skip"] == 0
+        assert page_1["limit"] == 2
+        assert page_1["has_more"] is True
+
+        page_2 = client.get("/api/applications?skip=2&limit=2", headers=headers).json()
+        assert len(page_2["applications"]) == 1
+        assert page_2["has_more"] is False
+
+        # No application shows up on both pages.
+        ids_1 = {a["application_id"] for a in page_1["applications"]}
+        ids_2 = {a["application_id"] for a in page_2["applications"]}
+        assert ids_1.isdisjoint(ids_2)
+    finally:
+        # Deleting the user also deletes their applications, so the extra jobs can then be removed.
+        client.delete("/api/users/me", headers=headers)
+        for job_id in job_ids[1:]:
+            client.delete(f"/api/jobs/{job_id}", headers=rudra_headers)

@@ -1,24 +1,46 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from auth import CurrentUser
+from config import settings
 from database import get_db
 from routers.helpers import commit_or_raise_conflict, ensure_job_url_available, get_company_or_404, get_job_or_404
-from schemas import JobBase, JobCreate, JobResponse, JobUpdate
+from schemas import JobBase, JobCreate, JobResponse, JobUpdate, PaginatedJobsResponse
 
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[JobResponse])
-async def get_jobs(db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(select(models.Job))
-    return result.scalars().all()
+@router.get("", response_model=PaginatedJobsResponse)
+async def get_jobs(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = settings.items_per_page,
+):
+    count_result = await db.execute(select(func.count()).select_from(models.Job))
+    total = count_result.scalar() or 0
+
+    # Newest postings first; job_id breaks ties so rows with the same date keep a fixed order between pages.
+    result = await db.execute(
+        select(models.Job)
+        .order_by(models.Job.job_posting_date.desc(), models.Job.job_id)
+        .offset(skip)
+        .limit(limit)
+    )
+    jobs = result.scalars().all()
+
+    return PaginatedJobsResponse(
+        jobs=[JobResponse.model_validate(job) for job in jobs],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=skip + len(jobs) < total,
+    )
 
 
 @router.post("", response_model=JobResponse, status_code=status.HTTP_201_CREATED)

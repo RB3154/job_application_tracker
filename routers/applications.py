@@ -1,11 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from auth import CurrentUser
+from config import settings
 from database import get_db
 from routers.helpers import (
     commit_or_raise_conflict,
@@ -13,16 +14,47 @@ from routers.helpers import (
     get_application_or_404,
     get_job_or_404,
 )
-from schemas import ApplicationCreate, ApplicationReplace, ApplicationResponse, ApplicationUpdate
+from schemas import (
+    ApplicationCreate,
+    ApplicationReplace,
+    ApplicationResponse,
+    ApplicationUpdate,
+    PaginatedApplicationsResponse,
+)
 
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[ApplicationResponse])
-async def get_applications(current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(select(models.Application).where(models.Application.user_id == current_user.id))
-    return result.scalars().all()
+@router.get("", response_model=PaginatedApplicationsResponse)
+async def get_applications(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = settings.items_per_page,
+):
+    count_result = await db.execute(
+        select(func.count()).select_from(models.Application).where(models.Application.user_id == current_user.id)
+    )
+    total = count_result.scalar() or 0
+
+    # Most recent first; application_id breaks ties so applications on the same day keep a fixed order between pages.
+    result = await db.execute(
+        select(models.Application)
+        .where(models.Application.user_id == current_user.id)
+        .order_by(models.Application.date_applied.desc(), models.Application.application_id.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    applications = result.scalars().all()
+
+    return PaginatedApplicationsResponse(
+        applications=[ApplicationResponse.model_validate(application) for application in applications],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=skip + len(applications) < total,
+    )
 
 
 @router.post("", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)

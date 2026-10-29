@@ -1,23 +1,45 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from auth import CurrentUser
+from config import settings
 from database import get_db
 from routers.helpers import commit_or_raise_conflict, get_company_or_404
-from schemas import CompanyBase, CompanyCreate, CompanyResponse, CompanyUpdate
+from schemas import CompanyBase, CompanyCreate, CompanyResponse, CompanyUpdate, PaginatedCompaniesResponse
 
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[CompanyResponse])
-async def get_companies(db: Annotated[AsyncSession, Depends(get_db)]):
-    result = await db.execute(select(models.Company))
-    return result.scalars().all()
+@router.get("", response_model=PaginatedCompaniesResponse)
+async def get_companies(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = settings.items_per_page,
+):
+    count_result = await db.execute(select(func.count()).select_from(models.Company))
+    total = count_result.scalar() or 0
+
+    # A-Z by name; company_id breaks ties so companies with the same name keep a fixed order between pages.
+    result = await db.execute(
+        select(models.Company)
+        .order_by(models.Company.company_name, models.Company.company_id)
+        .offset(skip)
+        .limit(limit)
+    )
+    companies = result.scalars().all()
+
+    return PaginatedCompaniesResponse(
+        companies=[CompanyResponse.model_validate(company) for company in companies],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=skip + len(companies) < total,
+    )
 
 
 @router.post("", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED)

@@ -83,3 +83,23 @@ def test_job_crud_when_logged_in(client, rudra, job):
 def test_company_with_jobs_cannot_be_deleted(client, rudra, job):
     _, headers = rudra
     assert client.delete(f"/api/companies/{job['company_id']}", headers=headers).status_code == 409
+
+
+# Company and job lists come back one page at a time, with the totals alongside.
+def test_companies_and_jobs_are_paginated(client, job):
+    for url, key in [("/api/companies", "companies"), ("/api/jobs", "jobs")]:
+        page = client.get(f"{url}?skip=0&limit=1").json()
+        assert len(page[key]) == 1
+        assert page["total"] >= 1
+        assert page["skip"] == 0
+        assert page["limit"] == 1
+        assert page["has_more"] == (page["total"] > 1)
+
+        # Without skip/limit you get the first page of the default size (10).
+        assert client.get(url).json()["limit"] == 10
+
+
+# skip can't be negative and limit must be between 1 and 100 (422 otherwise).
+def test_bad_page_numbers_are_rejected(client):
+    for query in ["skip=-1", "limit=0", "limit=101"]:
+        assert client.get(f"/api/jobs?{query}").status_code == 422

@@ -21,7 +21,7 @@ layer, and CRUD API.
 CRUD operations for companies:
 
 - Create a company
-- Retrieve all companies
+- Retrieve companies one page at a time (see [Pagination](#pagination))
 - Retrieve a company by ID
 - Replace a company using PUT
 - Partially update a company using PATCH
@@ -34,7 +34,7 @@ CRUD operations for companies:
 CRUD operations for job postings:
 
 - Create a job
-- Retrieve all jobs
+- Retrieve jobs one page at a time (see [Pagination](#pagination))
 - Retrieve a job by ID
 - Replace a job using PUT
 - Partially update a job using PATCH
@@ -87,7 +87,8 @@ all users.
 CRUD operations for job applications (login required):
 
 - Create an application for the logged-in user
-- Retrieve all of the logged-in user's applications
+- Retrieve the logged-in user's applications one page at a time (see
+  [Pagination](#pagination))
 - Retrieve an application by ID
 - Replace an application using PUT
 - Partially update an application using PATCH
@@ -538,6 +539,50 @@ deleting companies or jobs requires login (any logged-in user).
 
 ---
 
+## Pagination
+
+The three list endpoints (`GET /api/companies`, `GET /api/jobs` and
+`GET /api/applications`) return one page at a time instead of every row.
+
+| Query parameter | Meaning | Default | Allowed |
+| --- | --- | --- | --- |
+| `skip` | How many rows to jump over | `0` | `0` or more |
+| `limit` | How many rows to return | `10` (`items_per_page`) | `1` to `100` |
+
+```text
+GET /api/jobs?skip=0&limit=10     → jobs 1–10
+GET /api/jobs?skip=10&limit=10    → jobs 11–20
+```
+
+These map straight to SQL `OFFSET` and `LIMIT`. Values outside the allowed
+range return `422`.
+
+Each response wraps the page in an object with the totals alongside:
+
+```json
+{
+  "jobs": [ ... ],
+  "total": 23,
+  "skip": 10,
+  "limit": 10,
+  "has_more": true
+}
+```
+
+The list key is `companies`, `jobs` or `applications`. `has_more` is `true`
+while `skip + (rows on this page) < total`, so a client can keep requesting the
+next page until it becomes `false`.
+
+Results are always sorted so pages never overlap or skip rows:
+
+| Endpoint | Order |
+| --- | --- |
+| Companies | `company_name` A–Z, then `company_id` |
+| Jobs | `job_posting_date` newest first, then `job_id` |
+| Applications | `date_applied` newest first, then `application_id` newest first |
+
+---
+
 ## PUT vs PATCH
 
 The API distinguishes between full replacement and partial updates.
@@ -818,6 +863,7 @@ CompanyBase
 CompanyCreate
 CompanyResponse
 CompanyUpdate
+PaginatedCompaniesResponse
 ```
 
 ### Job
@@ -827,6 +873,7 @@ JobBase
 JobCreate
 JobResponse
 JobUpdate
+PaginatedJobsResponse
 ```
 
 ### Application
@@ -837,11 +884,15 @@ ApplicationCreate
 ApplicationResponse
 ApplicationReplace
 ApplicationUpdate
+PaginatedApplicationsResponse
 ```
 
 `ApplicationCreate` only takes the job and optional date/status; the owner is
 taken from the access token. `ApplicationResponse` includes both
 `application_id` and `user_id`.
+
+The `Paginated...Response` schemas wrap one page of a list together with
+`total`, `skip`, `limit` and `has_more` (see [Pagination](#pagination)).
 
 ### User
 
@@ -1062,10 +1113,12 @@ A single `Settings` class (built on `pydantic-settings`) loads values from
 | `algorithm` | `ALGORITHM` | `HS256` |
 | `access_token_expire_minutes` | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` |
 | `max_upload_size_bytes` | `MAX_UPLOAD_SIZE_BYTES` | `5242880` (5 MB) |
+| `items_per_page` | `ITEMS_PER_PAGE` | `10` |
 
 `secret_key` is stored as a `SecretStr` so it is not shown in logs or reprs.
 
-Both `database.py` and `auth.py` import `settings` from `config.py`.
+`database.py`, `auth.py` and the routers import `settings` from `config.py`.
+The routers use `items_per_page` as the default `limit` for list endpoints.
 
 ---
 
@@ -1241,9 +1294,11 @@ and check the responses:
 - `tests/test_pictures.py` — profile picture upload and delete: resizing to
   300x300 JPEG, other image types, replacing, size limit, non-image files,
   login required, picture removed with the account
-- `tests/test_companies_jobs.py` — public reads, login required for writes
+- `tests/test_companies_jobs.py` — public reads, login required for writes,
+  paginated company and job lists, `422` for bad `skip`/`limit` values
 - `tests/test_applications.py` — owner access, `403` for other users, `404`s,
-  one application per job per user
+  one application per job per user, paginated application lists that don't
+  overlap between pages
 - `tests/conftest.py` — shared fixtures (test client, test users, test job)
 
 PostgreSQL must be running and `.env` must be configured. The server does not
@@ -1346,6 +1401,8 @@ Application
    ├── Update
    └── Delete
 ```
+
+The list endpoints for all three are paginated.
 
 Users support registration, login, and reading, partially updating (PATCH),
 and deleting their own account through `/api/users/me`, uploading and
@@ -1487,7 +1544,8 @@ Template for the `.env` file listing the required environment variables.
 ### `config.py`
 
 Contains the `pydantic-settings` application settings (database URL, JWT
-secret key, algorithm, and token lifetime).
+secret key, algorithm, token lifetime, upload size limit, and default page
+size).
 
 ### `auth.py`
 
@@ -1563,7 +1621,9 @@ Users, Application Ownership & Auth Utilities
   ↓
 Login Endpoint & Protected Routes
   ↓
-Profile Picture Uploads   ← current
+Profile Picture Uploads
+  ↓
+Pagination   ← current
   ↓
 Admin Rights for Companies and Jobs
   ↓
@@ -1583,7 +1643,7 @@ Deployment
 ```
 
 The router organization, users, application ownership, login, protected
-application routes, and profile picture uploads are now implemented as part of the current backend
+application routes, profile picture uploads, and pagination of list endpoints are now implemented as part of the current backend
 architecture.
 
 The exact implementation order may evolve as the project develops.
@@ -1610,6 +1670,7 @@ The project is intended to provide practical experience with:
 - Foreign keys and constraints
 - Database migrations
 - CRUD operations
+- Pagination
 - Password hashing and JWT authentication
 - Error handling
 - API documentation
