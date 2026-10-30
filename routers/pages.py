@@ -1,24 +1,28 @@
 """HTML pages for the browser frontend.
 
 These routes return Jinja2 templates instead of JSON and are hidden from /docs.
-Public data (jobs, companies) is rendered on the server; anything that needs the
-logged-in user (dashboard, account) is loaded by JavaScript calling the /api routes,
-because the login token lives in the browser's localStorage, not in a cookie.
+Everything is private: apart from the welcome, login, sign-up and password reset pages,
+every page needs the login cookie (PageUser) and only shows the logged-in user's own data.
+Jobs and companies are rendered on the server; the dashboard and account page load their
+data with JavaScript calling the /api routes.
 """
 
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import models
+from auth import PageUser
 from config import settings
 from database import get_db
-from schemas import CompanyResponse, JobResponse
+from routers.companies import filter_companies
+from routers.helpers import filter_jobs, get_job_with_details_or_404, paginate
+from schemas import CompanyResponse, JobFilters, JobResponse
 
 
 router = APIRouter(include_in_schema=False)
@@ -28,55 +32,53 @@ templates = Jinja2Templates(directory="templates")
 
 @router.get("/", name="home")
 async def home_page(request: Request):
-    return templates.TemplateResponse(request, "home.html", {"title": "Dashboard"})
+    return templates.TemplateResponse(request, "home.html", {"title": "My applications"})
 
 
 @router.get("/jobs", name="jobs_page")
-async def jobs_page(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
-    count_result = await db.execute(select(func.count()).select_from(models.Job))
-    total = count_result.scalar() or 0
+async def jobs_page(
+    request: Request,
+    user: PageUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    filters: Annotated[JobFilters, Query()],
+):
+    # Same filters and order as GET /api/jobs, so "Load more" continues exactly where this page stops.
+    query = filter_jobs(select(models.Job).options(selectinload(models.Job.company)), filters, user.id)
+    query = query.order_by(models.Job.job_posting_date.desc(), models.Job.job_id)
+    page = await paginate(query, db, skip=0, limit=settings.items_per_page)
 
-    # Same order as GET /api/jobs, so "Load more" continues exactly where this page stops.
-    result = await db.execute(
-        select(models.Job)
-        .options(selectinload(models.Job.company))
-        .order_by(models.Job.job_posting_date.desc(), models.Job.job_id)
-        .limit(settings.items_per_page)
-    )
-    jobs = result.scalars().all()
+    # Choices for the filter dropdowns: the user's own list entries, A-Z.
+    async def own_entries(model, name_column):
+        result = await db.execute(select(model).where(model.user_id == user.id).order_by(name_column))
+        return result.scalars().all()
+
+    locations = await own_entries(models.Location, models.Location.name)
+    skills = await own_entries(models.Skill, models.Skill.skill_name)
+    work_modes = await own_entries(models.WorkMode, models.WorkMode.name)
 
     return templates.TemplateResponse(
         request,
         "jobs.html",
         {
             "title": "Jobs",
-            "jobs": jobs,
-            "total": total,
+            "jobs": page.items,
+            "total": page.total,
             "limit": settings.items_per_page,
-            "has_more": len(jobs) < total,
+            "has_more": page.has_more,
             "today": date.today(),
+            "filters": filters,
+            "is_filtered": filters != JobFilters(),
+            "locations": locations,
+            "skills": skills,
+            "work_modes": work_modes,
         },
     )
 
 
 @router.get("/jobs/{job_id}", name="job_page")
-async def job_page(request: Request, job_id: str, db: Annotated[AsyncSession, Depends(get_db)]):
-    # selectinload fetches the related rows up front; async sessions can't lazy-load them later in the template.
-    result = await db.execute(
-        select(models.Job)
-        .options(
-            selectinload(models.Job.company),
-            selectinload(models.Job.locations),
-            selectinload(models.Job.work_modes),
-            selectinload(models.Job.sources),
-            selectinload(models.Job.job_skills).selectinload(models.JobSkill.skill),
-            selectinload(models.Job.job_educations).selectinload(models.JobEducation.education_requirement),
-        )
-        .where(models.Job.job_id == job_id)
-    )
-    job = result.scalar_one_or_none()
-    if job is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+async def job_page(request: Request, user: PageUser, job_id: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    # Loads the job's company, locations, skills, etc. up front, so the template can show them.
+    job = await get_job_with_details_or_404(job_id, user.id, db)
 
     return templates.TemplateResponse(
         request,
@@ -92,42 +94,44 @@ async def job_page(request: Request, job_id: str, db: Annotated[AsyncSession, De
 
 
 @router.get("/companies", name="companies_page")
-async def companies_page(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
-    count_result = await db.execute(select(func.count()).select_from(models.Company))
-    total = count_result.scalar() or 0
-
-    result = await db.execute(
-        select(models.Company)
-        .order_by(models.Company.company_name, models.Company.company_id)
-        .limit(settings.items_per_page)
-    )
-    companies = result.scalars().all()
+async def companies_page(
+    request: Request,
+    user: PageUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    q: Annotated[str | None, Query(max_length=100)] = None,
+):
+    query = filter_companies(select(models.Company), q, user.id)
+    query = query.order_by(models.Company.company_name, models.Company.company_id)
+    page = await paginate(query, db, skip=0, limit=settings.items_per_page)
 
     return templates.TemplateResponse(
         request,
         "companies.html",
         {
             "title": "Companies",
-            "companies": companies,
-            "total": total,
+            "companies": page.items,
+            "total": page.total,
             "limit": settings.items_per_page,
-            "has_more": len(companies) < total,
+            "has_more": page.has_more,
+            "q": (q or "").strip(),
         },
     )
 
 
 @router.get("/companies/{company_id}", name="company_page")
-async def company_page(request: Request, company_id: str, db: Annotated[AsyncSession, Depends(get_db)]):
+async def company_page(request: Request, user: PageUser, company_id: str, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
         select(models.Company)
         .options(selectinload(models.Company.locations), selectinload(models.Company.jobs))
-        .where(models.Company.company_id == company_id)
+        .where(models.Company.company_id == company_id, models.Company.user_id == user.id)
     )
     company = result.scalar_one_or_none()
     if company is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
 
-    jobs = sorted(company.jobs, key=lambda job: (job.job_posting_date, job.job_id), reverse=True)
+    # Same order as the Jobs page: newest posting first, then job_id A-Z for jobs posted the same day.
+    # (A minus sign on the date's day number flips just the date to newest-first.)
+    jobs = sorted(company.jobs, key=lambda job: (-job.job_posting_date.toordinal(), job.job_id))
 
     return templates.TemplateResponse(
         request,
@@ -153,7 +157,7 @@ async def register_page(request: Request):
 
 
 @router.get("/account", name="account_page")
-async def account_page(request: Request):
+async def account_page(request: Request, user: PageUser):
     return templates.TemplateResponse(request, "account.html", {"title": "Account"})
 
 
