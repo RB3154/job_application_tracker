@@ -3,12 +3,23 @@
     <div class="page-header">
         <div>
             <h1>Companies</h1>
-            <p class="text-muted-soft mb-0">{{ total }} compan{{ "ies" if total != 1 else "y" }}, A to Z</p>
+            <p class="text-muted-soft mb-0">
+                {{ total }} {{ "matching " if q }}compan{{ "ies" if total != 1 else "y" }}, A to Z
+            </p>
         </div>
-        <button type="button" class="btn btn-primary d-none" data-open-form="company" data-logged-in-only>
+        <button type="button" class="btn btn-primary" data-open-form="company">
             <i class="bi bi-plus-lg"></i> New company
         </button>
     </div>
+    <!-- Search: a normal GET form, so the search ends up in the URL (/companies?q=...). -->
+    <form class="d-flex gap-2 mb-4" method="get" action="{{ url_for('companies_page') }}" role="search">
+        <input type="search" class="form-control" name="q" value="{{ q }}" placeholder="Search companies"
+               aria-label="Search companies" maxlength="100">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i><span class="visually-hidden">Search</span></button>
+        {% if q %}
+            <a class="btn btn-outline-secondary" href="{{ url_for('companies_page') }}">Clear</a>
+        {% endif %}
+    </form>
     <div class="row g-3 mb-4" id="companiesContainer">
         {% for company in companies %}
             <div class="col-md-6 col-xl-4">
@@ -27,7 +38,11 @@
             <div class="col-12">
                 <div class="content-section empty-state">
                     <i class="bi bi-building"></i>
-                    <p class="mb-0">No companies yet. Log in and use <strong>Add → New company</strong> to add one.</p>
+                    {% if q %}
+                        <p class="mb-0">No companies match "{{ q }}". <a href="{{ url_for('companies_page') }}">Show all</a></p>
+                    {% else %}
+                        <p class="mb-0">You haven't saved any companies yet. <strong>Add application</strong> adds one for you, or use <strong>Add → New company</strong>.</p>
+                    {% endif %}
                 </div>
             </div>
         {% endfor %}
@@ -69,7 +84,11 @@
         async function loadMoreCompanies() {
           setButtonLoading(loadMoreBtn, true, "Loading...");
           try {
-            const data = await apiFetch(`/api/companies?skip=${currentOffset}&limit=${limit}`);
+            // Send the filters this page was opened with (they're in its URL), plus the next page's position.
+            const params = new URLSearchParams(window.location.search);
+            params.set("skip", currentOffset);
+            params.set("limit", limit);
+            const data = await apiFetch(`/api/companies?${params}`);
             for (const company of data.companies) {
               companiesContainer.insertAdjacentHTML("beforeend", createCompanyHTML(company));
             }

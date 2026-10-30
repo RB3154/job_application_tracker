@@ -14,9 +14,9 @@
             <p class="lead text-muted-soft mx-auto mb-4" style="max-width: 36rem">
                 Save the jobs you find, track where each application stands, and see how your search is going at a glance.
             </p>
-            <div class="d-flex justify-content-center gap-2">
+            <div class="d-flex flex-column align-items-center gap-2">
                 <a class="btn btn-primary btn-lg" href="{{ url_for('register_page') }}">Create free account</a>
-                <a class="btn btn-outline-primary btn-lg" href="{{ url_for('jobs_page') }}">Browse jobs</a>
+                <span class="small">Already have an account? <a href="{{ url_for('login_page') }}">Log in</a></span>
             </div>
         </section>
         <div class="row g-3">
@@ -50,23 +50,33 @@
                 <h1 id="greeting">Your applications</h1>
                 <p class="text-muted-soft mb-0">Here's where your job search stands.</p>
             </div>
-            <a class="btn btn-primary" href="{{ url_for('jobs_page') }}"><i class="bi bi-search me-1"></i>Find jobs to apply to</a>
+            <button type="button" class="btn btn-primary" data-open-form="application"><i class="bi bi-plus-lg me-1"></i>Add application</button>
         </div>
         <div class="row g-3 mb-4" id="stats"></div>
+        <!-- Needs attention: filled in by dashboard.js, hidden when there's nothing to show -->
+        <section class="content-section attention-panel p-3 mb-4 d-none" id="attentionPanel" aria-labelledby="attentionTitle"></section>
         <section class="content-section">
             <div class="d-flex flex-column flex-lg-row gap-3 justify-content-between align-items-lg-start p-3 border-bottom">
                 <div class="filter-pills" id="statusFilters" role="group" aria-label="Filter by status"></div>
-                <div class="input-group input-group-sm" style="max-width: 18rem">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="search" class="form-control" id="searchInput" placeholder="Search role or company" aria-label="Search role or company">
+                <div class="d-flex gap-2 align-items-center">
+                    <div class="input-group input-group-sm" style="max-width: 18rem">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="search" class="form-control" id="searchInput" placeholder="Search role or company" aria-label="Search role or company">
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Choose a view" id="viewToggle">
+                        <button type="button" class="btn btn-outline-secondary" data-view="table" title="Table view"><i class="bi bi-list-ul"></i><span class="visually-hidden">Table</span></button>
+                        <button type="button" class="btn btn-outline-secondary" data-view="board" title="Board view"><i class="bi bi-kanban"></i><span class="visually-hidden">Board</span></button>
+                    </div>
                 </div>
             </div>
-            <div class="table-responsive">
+            <!-- Board view: one column per status, cards drawn by dashboard.js -->
+            <div class="board p-3 d-none" id="boardView"></div>
+            <div class="table-responsive" id="tableView">
                 <table class="table applications-table">
                     <thead>
                         <tr>
                             <th scope="col" class="ps-3">Role</th>
-                            <th scope="col">Applied</th>
+                            <th scope="col">Date</th>
                             <th scope="col">Status</th>
                             <th scope="col">Interviews</th>
                             <th scope="col" class="pe-3"><span class="visually-hidden">Actions</span></th>
@@ -80,228 +90,5 @@
     </div>
 {% endblock content %}
 {% block scripts %}
-    <script type="module">
-        import { apiFetch, fetchAllPages, getCompany, getCurrentUser, getJob } from "/static/js/api.js";
-        import { STATUSES, confirmDialog, escapeHtml, formatDate, showToast } from "/static/js/utils.js";
-
-        const ACTIVE_STATUSES = ["Applied", "Screening", "Interview"];
-
-        // All of the user's applications, each with its job and company attached for display.
-        let applications = [];
-        let statusFilter = "All";
-        let searchText = "";
-
-        const statsElement = document.getElementById("stats");
-        const filtersElement = document.getElementById("statusFilters");
-        const tbody = document.getElementById("applicationsBody");
-        const emptyState = document.getElementById("emptyState");
-
-        function show(stateId) {
-          for (const id of ["loadingState", "welcomeState", "dashboardState"]) {
-            document.getElementById(id).classList.toggle("d-none", id !== stateId);
-          }
-        }
-
-        function countBy(statuses) {
-          return applications.filter((app) => statuses.includes(app.current_status)).length;
-        }
-
-        function renderStats() {
-          const total = applications.length;
-          // "Heard back" = anything past Applied, not counting ones you withdrew yourself.
-          const considered = total - countBy(["Withdrawn"]);
-          const heardBack = considered - countBy(["Applied"]);
-          const responseRate = considered > 0 ? `${Math.round((heardBack / considered) * 100)}%` : "–";
-
-          const stats = [
-            { label: "Total applications", value: total, icon: "bi-send" },
-            { label: "Active", value: countBy(ACTIVE_STATUSES), icon: "bi-hourglass-split" },
-            { label: "Interviewing", value: countBy(["Interview"]), icon: "bi-people" },
-            { label: "Offers", value: countBy(["Offer", "Accepted"]), icon: "bi-trophy" },
-            { label: "Response rate", value: responseRate, icon: "bi-reply" },
-          ];
-          statsElement.innerHTML = stats
-            .map(
-              (stat) => `
-              <div class="col-6 col-md-4 col-xl">
-                <div class="content-section stat-card">
-                  <div class="d-flex justify-content-between align-items-start">
-                    <div class="stat-value">${stat.value}</div>
-                    <i class="bi ${stat.icon} text-muted-soft fs-5"></i>
-                  </div>
-                  <div class="stat-label mt-1">${stat.label}</div>
-                </div>
-              </div>`,
-            )
-            .join("");
-        }
-
-        function renderFilters() {
-          const options = ["All", ...STATUSES];
-          filtersElement.innerHTML = options
-            .map((status) => {
-              const count = status === "All" ? applications.length : countBy([status]);
-              const active = status === statusFilter;
-              return `<button type="button" class="filter-pill ${active ? "active" : ""}" data-status="${status}" aria-pressed="${active}">
-                        ${status}<span class="count">${count}</span>
-                      </button>`;
-            })
-            .join("");
-        }
-
-        function rowHTML(app) {
-          const role = app.job?.role ?? `Deleted job (${app.job_id})`;
-          const companyName = app.company?.company_name ?? app.job?.company_id ?? "";
-          const statusOptions = STATUSES.map(
-            (status) => `<option ${status === app.current_status ? "selected" : ""}>${status}</option>`,
-          ).join("");
-          const statusClass = `status-${(app.current_status ?? "Applied").toLowerCase()}`;
-          return `
-            <tr data-id="${app.application_id}">
-              <td class="ps-3">
-                <a class="fw-semibold" href="/jobs/${encodeURIComponent(app.job_id)}">${escapeHtml(role)}</a>
-                <div class="small text-muted-soft">${escapeHtml(companyName)}</div>
-              </td>
-              <td class="text-nowrap">${formatDate(app.date_applied)}</td>
-              <td>
-                <select class="form-select form-select-sm status-select ${statusClass}" data-action="status" aria-label="Status for ${escapeHtml(role)}">
-                  ${statusOptions}
-                </select>
-              </td>
-              <td>
-                <div class="rounds-control">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="rounds" data-delta="-1" aria-label="One less interview round" ${app.interview_rounds === 0 ? "disabled" : ""}>−</button>
-                  <span class="rounds-value">${app.interview_rounds}</span>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-action="rounds" data-delta="1" aria-label="One more interview round">+</button>
-                </div>
-              </td>
-              <td class="text-end pe-3">
-                <button type="button" class="btn btn-sm btn-link text-danger" data-action="delete" aria-label="Delete application" title="Delete application">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </td>
-            </tr>`;
-        }
-
-        function renderTable() {
-          const query = searchText.toLowerCase();
-          const visible = applications.filter((app) => {
-            const matchesStatus = statusFilter === "All" || app.current_status === statusFilter;
-            const haystack = `${app.job?.role ?? ""} ${app.company?.company_name ?? ""}`.toLowerCase();
-            return matchesStatus && haystack.includes(query);
-          });
-
-          tbody.innerHTML = visible.map(rowHTML).join("");
-
-          if (applications.length === 0) {
-            emptyState.innerHTML = `
-              <i class="bi bi-inbox"></i>
-              <p class="mb-3">You haven't tracked any applications yet.</p>
-              <a class="btn btn-primary" href="/jobs">Browse jobs</a>
-              <p class="small mt-3 mb-0">Open a job and click <strong>I applied</strong> to add it here.</p>`;
-          } else {
-            emptyState.innerHTML = `<i class="bi bi-funnel"></i><p class="mb-0">No applications match this filter.</p>`;
-          }
-          emptyState.classList.toggle("d-none", visible.length > 0);
-        }
-
-        function renderAll() {
-          renderStats();
-          renderFilters();
-          renderTable();
-        }
-
-        // Save a change to one application and redraw the dashboard with the server's answer.
-        async function updateApplication(app, changes) {
-          try {
-            const updated = await apiFetch(`/api/applications/${app.application_id}`, { method: "PATCH", body: changes });
-            Object.assign(app, updated);
-            showToast("Application updated");
-          } catch (error) {
-            showToast(error.message, "danger");
-          }
-          renderAll();
-        }
-
-        filtersElement.addEventListener("click", (event) => {
-          const button = event.target.closest("[data-status]");
-          if (button) {
-            statusFilter = button.dataset.status;
-            renderFilters();
-            renderTable();
-          }
-        });
-
-        document.getElementById("searchInput").addEventListener("input", (event) => {
-          searchText = event.target.value.trim();
-          renderTable();
-        });
-
-        // One listener on the table handles the controls in every row ("event delegation").
-        tbody.addEventListener("change", (event) => {
-          if (event.target.dataset.action !== "status") {
-            return;
-          }
-          const app = applications.find((item) => item.application_id === Number(event.target.closest("tr").dataset.id));
-          updateApplication(app, { current_status: event.target.value });
-        });
-
-        tbody.addEventListener("click", async (event) => {
-          const button = event.target.closest("button[data-action]");
-          if (!button) {
-            return;
-          }
-          const app = applications.find((item) => item.application_id === Number(button.closest("tr").dataset.id));
-
-          if (button.dataset.action === "rounds") {
-            const rounds = Math.max(0, app.interview_rounds + Number(button.dataset.delta));
-            updateApplication(app, { interview_rounds: rounds });
-          }
-
-          if (button.dataset.action === "delete") {
-            const role = app.job?.role ?? app.job_id;
-            const confirmed = await confirmDialog(`Stop tracking your application for "${role}"?`, { title: "Delete application?" });
-            if (!confirmed) {
-              return;
-            }
-            try {
-              await apiFetch(`/api/applications/${app.application_id}`, { method: "DELETE" });
-              applications = applications.filter((item) => item !== app);
-              showToast("Application deleted");
-              renderAll();
-            } catch (error) {
-              showToast(error.message, "danger");
-            }
-          }
-        });
-
-        async function loadDashboard(user) {
-          document.getElementById("greeting").textContent = `Hi, ${user.username}`;
-          // The counts need every application, so fetch all pages (100 at a time) instead of just the first.
-          const items = await fetchAllPages("/api/applications", "applications");
-          // An application only stores job_id, and a job only stores company_id: look both up (each fetched once).
-          applications = await Promise.all(
-            items.map(async (app) => {
-              const job = await getJob(app.job_id);
-              const company = job ? await getCompany(job.company_id) : null;
-              return { ...app, job, company };
-            }),
-          );
-          renderAll();
-          show("dashboardState");
-        }
-
-        const user = await getCurrentUser();
-        if (!user) {
-          show("welcomeState");
-        } else {
-          try {
-            await loadDashboard(user);
-          } catch (error) {
-            show("dashboardState");
-            emptyState.innerHTML = `<i class="bi bi-exclamation-triangle"></i><p class="mb-0">${escapeHtml(error.message)}</p>`;
-            emptyState.classList.remove("d-none");
-          }
-        }
-    </script>
+    <script type="module" src="{{ url_for('static', path='js/dashboard.js') }}"></script>
 {% endblock scripts %}

@@ -3,7 +3,7 @@
 // added by "Load more" look the same as the ones rendered by the server.
 
 // Same list as ApplicationStatus in schemas.py.
-export const STATUSES = ["Applied", "Screening", "Interview", "Offer", "Accepted", "Rejected", "Withdrawn"];
+export const STATUSES = ["Wishlist", "Applied", "Screening", "Interview", "Offer", "Accepted", "Rejected", "Withdrawn"];
 
 // XSS prevention: always escape text from the API before putting it into innerHTML.
 export function escapeHtml(text) {
@@ -110,16 +110,6 @@ export function avatarHtml(user, size = 32) {
     return `<img class="avatar" src="${escapeHtml(user.image_path)}" alt="" width="${size}" height="${size}">`;
   }
   return `<span class="avatar avatar-initial" style="width:${size}px;height:${size}px;font-size:${size * 0.45}px">${initial(user.username)}</span>`;
-}
-
-// "Google India" -> "google-india", used to suggest company and job ids.
-export function slugify(text) {
-  return text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 100);
 }
 
 // Read a form into a plain object. Empty fields become null, so optional values are cleared.

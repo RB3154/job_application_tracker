@@ -80,7 +80,7 @@
 {% endblock content %}
 {% block scripts %}
     <script type="module">
-        import { apiFetch, clearToken, logout, requireUser } from "/static/js/api.js";
+        import { apiFetch, endSession, logout, requireUser, setToken } from "/static/js/api.js";
         import { avatarHtml, confirmDialog, queueToast, setButtonLoading, showToast } from "/static/js/utils.js";
 
         const avatarPreview = document.getElementById("avatarPreview");
@@ -202,6 +202,8 @@
                 new_password: newPasswordInput.value,
               },
             });
+            // The old token stopped working when the password changed; keep using the new one.
+            setToken(data.access_token);
             passwordForm.reset();
             showToast(data.message);
           } catch (error) {
@@ -223,7 +225,7 @@
           }
           try {
             await apiFetch("/api/users/me", { method: "DELETE" });
-            clearToken();
+            await endSession();
             queueToast("Your account has been deleted.", "info");
             window.location.href = "/";
           } catch (error) {

@@ -1,27 +1,22 @@
-// The "New / Edit company" and "New / Edit job" modals from layout.html.
+// The "New / Edit company", "New / Edit job" and quick "Add application" modals from layout.html.
 // They are opened from the navbar ("Add" menu) and from the company and job pages.
 
 import { apiFetch, fetchAllPages } from "/static/js/api.js";
-import { escapeHtml, formToObject, queueToast, setButtonLoading, showModal, showToast, slugify, todayISO } from "/static/js/utils.js";
+import {
+  STATUSES,
+  escapeHtml,
+  formToObject,
+  queueToast,
+  setButtonLoading,
+  showModal,
+  showToast,
+  todayISO,
+} from "/static/js/utils.js";
 
 function showFormError(form, message) {
   const box = form.querySelector(".form-error");
   box.textContent = message;
   box.classList.toggle("d-none", !message);
-}
-
-// Keep suggesting an id (e.g. "google" from "Google") until the user types their own.
-function suggestIdFrom(sourceInputs, idInput, makeId) {
-  idInput.addEventListener("input", () => {
-    idInput.dataset.touched = "true";
-  });
-  for (const input of sourceInputs) {
-    input.addEventListener("input", () => {
-      if (!idInput.dataset.touched && !idInput.readOnly) {
-        idInput.value = makeId();
-      }
-    });
-  }
 }
 
 function fillForm(form, values) {
@@ -43,16 +38,12 @@ function fillForm(form, values) {
 const companyForm = document.getElementById("companyForm");
 let editingCompany = null;
 
-suggestIdFrom([companyForm.company_name], companyForm.company_id, () => slugify(companyForm.company_name.value));
-
 export function openCompanyForm(company = null) {
   editingCompany = company;
   companyForm.reset();
   showFormError(companyForm, "");
   document.getElementById("companyModalLabel").textContent = company ? "Edit company" : "New company";
   companyForm.querySelector("[type=submit]").textContent = company ? "Save changes" : "Create company";
-  companyForm.company_id.readOnly = Boolean(company);
-  companyForm.company_id.dataset.touched = company ? "true" : "";
   if (company) {
     fillForm(companyForm, company);
   }
@@ -68,7 +59,6 @@ companyForm.addEventListener("submit", async (event) => {
 
   try {
     if (editingCompany) {
-      delete data.company_id;
       await apiFetch(`/api/companies/${encodeURIComponent(editingCompany.company_id)}`, { method: "PATCH", body: data });
       queueToast("Company updated");
       window.location.reload();
@@ -87,10 +77,6 @@ companyForm.addEventListener("submit", async (event) => {
 
 const jobForm = document.getElementById("jobForm");
 let editingJob = null;
-
-suggestIdFrom([jobForm.role, jobForm.company_id], jobForm.job_id, () =>
-  slugify(`${jobForm.company_id.value} ${jobForm.role.value}`),
-);
 
 async function loadCompanyOptions(selectedId) {
   const select = jobForm.company_id;
@@ -120,8 +106,6 @@ export function openJobForm(job = null, { companyId = null } = {}) {
   showFormError(jobForm, "");
   document.getElementById("jobModalLabel").textContent = job ? "Edit job" : "New job";
   jobForm.querySelector("[type=submit]").textContent = job ? "Save changes" : "Create job";
-  jobForm.job_id.readOnly = Boolean(job);
-  jobForm.job_id.dataset.touched = job ? "true" : "";
   if (job) {
     fillForm(jobForm, job);
   } else {
@@ -141,7 +125,6 @@ jobForm.addEventListener("submit", async (event) => {
 
   try {
     if (editingJob) {
-      delete data.job_id;
       await apiFetch(`/api/jobs/${encodeURIComponent(editingJob.job_id)}`, { method: "PATCH", body: data });
       queueToast("Job updated");
       window.location.reload();
@@ -152,6 +135,55 @@ jobForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     showFormError(jobForm, error.message);
+    setButtonLoading(submitButton, false);
+  }
+});
+
+/* ---------- Quick "Add application" form ---------- */
+
+const quickForm = document.getElementById("quickApplicationForm");
+quickForm.current_status.innerHTML = STATUSES.map((status) => `<option>${status}</option>`).join("");
+
+// `companyName` prefills the company, e.g. when adding from a company's page.
+export async function openQuickApplicationForm({ companyName = null } = {}) {
+  quickForm.reset();
+  quickForm.querySelectorAll("details").forEach((section) => (section.open = false));
+  quickForm.company_name.value = companyName ?? "";
+  showFormError(quickForm, "");
+  quickForm.current_status.value = "Applied";
+  quickForm.date_applied.value = todayISO();
+  showModal("quickApplicationModal");
+
+  // Suggest existing companies as the user types. If loading fails, typing a name still works.
+  try {
+    const companies = await fetchAllPages("/api/companies", "companies");
+    document.getElementById("quickCompanyOptions").innerHTML = companies
+      .map((company) => `<option value="${escapeHtml(company.company_name)}"></option>`)
+      .join("");
+  } catch {
+    // Not needed to add an application.
+  }
+}
+
+quickForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const submitButton = quickForm.querySelector("[type=submit]");
+  showFormError(quickForm, "");
+  setButtonLoading(submitButton, true);
+  try {
+    const data = formToObject(quickForm);
+    data.salary_currency = data.salary_currency?.toUpperCase() ?? null;
+    await apiFetch("/api/applications/quick", { method: "POST", body: data });
+    queueToast("Application added");
+    // Show it on My applications (reload if that's where we already are).
+    if (window.location.pathname === "/") {
+      window.location.reload();
+    } else {
+      window.location.href = "/";
+    }
+  } catch (error) {
+    // e.g. 409 "This user has already applied to this job" when the link belongs to a job already tracked.
+    showFormError(quickForm, error.message);
     setButtonLoading(submitButton, false);
   }
 });

@@ -4,19 +4,82 @@
     <div class="page-header">
         <div>
             <h1>Jobs</h1>
-            <p class="text-muted-soft mb-0">{{ total }} job{{ "s" if total != 1 }}, newest first</p>
+            <p class="text-muted-soft mb-0">
+                {{ total }} {{ "matching " if is_filtered }}job{{ "s" if total != 1 }}, newest first
+            </p>
         </div>
-        <button type="button" class="btn btn-primary d-none" data-open-form="job" data-logged-in-only>
+        <button type="button" class="btn btn-primary" data-open-form="job">
             <i class="bi bi-plus-lg"></i> New job
         </button>
     </div>
+    <!-- Filters: a normal GET form, so the filters end up in the URL (/jobs?q=...&location_id=...). -->
+    <form class="content-section p-3 mb-4" method="get" action="{{ url_for('jobs_page') }}" role="search">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label for="filterQ" class="form-label small mb-1">Search</label>
+                <input type="search" class="form-control" id="filterQ" name="q" value="{{ filters.q or '' }}"
+                       placeholder="Role or company" maxlength="100">
+            </div>
+            {% if locations %}
+                <div class="col-6 col-md-2">
+                    <label for="filterLocation" class="form-label small mb-1">Location</label>
+                    <select class="form-select" id="filterLocation" name="location_id">
+                        <option value="">Any</option>
+                        {% for location in locations %}
+                            <option value="{{ location.loc_id }}" {{ "selected" if filters.location_id == location.loc_id }}>{{ location.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            {% if skills %}
+                <div class="col-6 col-md-2">
+                    <label for="filterSkill" class="form-label small mb-1">Skill</label>
+                    <select class="form-select" id="filterSkill" name="skill_id">
+                        <option value="">Any</option>
+                        {% for skill in skills %}
+                            <option value="{{ skill.skill_id }}" {{ "selected" if filters.skill_id == skill.skill_id }}>{{ skill.skill_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            {% if work_modes %}
+                <div class="col-6 col-md-2">
+                    <label for="filterWorkMode" class="form-label small mb-1">Work mode</label>
+                    <select class="form-select" id="filterWorkMode" name="work_mode_id">
+                        <option value="">Any</option>
+                        {% for work_mode in work_modes %}
+                            <option value="{{ work_mode.work_mode_id }}" {{ "selected" if filters.work_mode_id == work_mode.work_mode_id }}>{{ work_mode.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            <div class="col-auto">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" role="switch" id="filterOpen" name="open_only" value="true"
+                           {{ "checked" if filters.open_only }}>
+                    <label class="form-check-label small" for="filterOpen">Still open</label>
+                </div>
+            </div>
+            <div class="col-auto d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-search me-1"></i>Search</button>
+                {% if is_filtered %}
+                    <a class="btn btn-outline-secondary" href="{{ url_for('jobs_page') }}">Clear</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
     <div id="jobsContainer">
         {% for job in jobs %}
             {{ job_card(job, today) }}
         {% else %}
             <div class="content-section empty-state">
-                <i class="bi bi-briefcase"></i>
-                <p class="mb-0">No jobs yet. Log in and use <strong>Add → New job</strong> to save the first one.</p>
+                {% if is_filtered %}
+                    <i class="bi bi-funnel"></i>
+                    <p class="mb-0">No jobs match these filters. <a href="{{ url_for('jobs_page') }}">Clear filters</a></p>
+                {% else %}
+                    <i class="bi bi-briefcase"></i>
+                    <p class="mb-0">You haven't saved any jobs yet. <strong>Add application</strong> saves one for you, or use <strong>Add → New job</strong>.</p>
+                {% endif %}
             </div>
         {% endfor %}
     </div>
@@ -70,7 +133,11 @@
         async function loadMoreJobs() {
           setButtonLoading(loadMoreBtn, true, "Loading...");
           try {
-            const data = await apiFetch(`/api/jobs?skip=${currentOffset}&limit=${limit}`);
+            // Send the filters this page was opened with (they're in its URL), plus the next page's position.
+            const params = new URLSearchParams(window.location.search);
+            params.set("skip", currentOffset);
+            params.set("limit", limit);
+            const data = await apiFetch(`/api/jobs?${params}`);
             // The API only gives company_id, so look up each company's name (cached in api.js).
             const companies = await Promise.all(data.jobs.map((job) => getCompany(job.company_id)));
             data.jobs.forEach((job, index) => {

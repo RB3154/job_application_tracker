@@ -28,10 +28,13 @@
                             View posting <i class="bi bi-box-arrow-up-right ms-1"></i>
                         </a>
                     {% endif %}
-                    <button type="button" class="btn btn-outline-secondary d-none" id="editJobBtn" data-logged-in-only>
+                    <button type="button" class="btn btn-outline-secondary" id="editJobBtn">
                         <i class="bi bi-pencil"></i> Edit
                     </button>
-                    <button type="button" class="btn btn-outline-danger d-none" id="deleteJobBtn" data-logged-in-only>
+                    <button type="button" class="btn btn-outline-secondary" id="editDetailsBtn">
+                        <i class="bi bi-tags"></i> Skills &amp; locations
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" id="deleteJobBtn">
                         <i class="bi bi-trash"></i> Delete
                     </button>
                 </div>
@@ -100,10 +103,14 @@
                     {% endif %}
                 </section>
             {% endif %}
-            <!-- Job description -->
+            <!-- Job description (optional) -->
             <section class="content-section p-4 mb-4">
                 <h2 class="section-title">Job description</h2>
-                <div class="job-description">{{ job.JD }}</div>
+                {% if job.JD %}
+                    <div class="job-description">{{ job.JD }}</div>
+                {% else %}
+                    <p class="text-muted-soft mb-0">No description saved.</p>
+                {% endif %}
             </section>
         </div>
         <!-- Your application (filled in by JavaScript, because it needs the login token) -->
@@ -122,8 +129,7 @@
     <!-- Track / update application modal -->
     <div class="modal fade" id="applicationModal" tabindex="-1" aria-labelledby="applicationModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form id="applicationForm">
+            <form class="modal-content" id="applicationForm">
                     <div class="modal-header">
                         <h5 class="modal-title" id="applicationModalLabel">Track application</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -134,14 +140,20 @@
                         <div class="mb-3">
                             <label for="dateApplied" class="form-label">Date applied</label>
                             <input type="date" class="form-control" id="dateApplied" name="date_applied" required>
+                            <div class="form-text">For Wishlist, the date you saved it.</div>
                         </div>
                         <div class="mb-3">
                             <label for="applicationStatus" class="form-label">Status</label>
                             <select class="form-select" id="applicationStatus" name="current_status"></select>
                         </div>
-                        <div class="mb-1">
+                        <div class="mb-3">
                             <label for="interviewRounds" class="form-label">Interview rounds so far</label>
                             <input type="number" class="form-control" id="interviewRounds" name="interview_rounds" min="0" value="0" required>
+                        </div>
+                        <div class="mb-1">
+                            <label for="applicationNotes" class="form-label">Notes <span class="text-muted-soft">(optional, only you see them)</span></label>
+                            <textarea class="form-control" id="applicationNotes" name="notes" rows="3" maxlength="5000"
+                                      placeholder="e.g. Referred by a friend. First round was about system design."></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -149,7 +161,47 @@
                         <button type="submit" class="btn btn-primary">Save</button>
                     </div>
                 </form>
-            </div>
+        </div>
+    </div>
+    <!-- Skills & locations modal. The pickers inside are built by static/js/pickers.js. -->
+    <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <form class="modal-content" id="detailsForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="detailsModalLabel">Skills &amp; locations</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger form-error d-none" role="alert"></div>
+                        <p class="text-muted-soft small">Pick from the list as you type, or type a new name to add it.</p>
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <p class="section-title">Locations</p>
+                                <div id="locationsPicker"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="section-title">Work mode</p>
+                                <div id="workModesPicker"></div>
+                            </div>
+                            <div class="col-12">
+                                <p class="section-title">Skills</p>
+                                <div id="skillsPicker"></div>
+                            </div>
+                            <div class="col-12">
+                                <p class="section-title">Education</p>
+                                <div id="educationPicker"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="section-title">Found on</p>
+                                <div id="sourcesPicker"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
         </div>
     </div>
 {% endblock content %}
@@ -157,6 +209,7 @@
     <script type="module">
         import { apiFetch, fetchAllPages, getCurrentUser } from "/static/js/api.js";
         import { openJobForm } from "/static/js/forms.js";
+        import { createPicker } from "/static/js/pickers.js";
         import {
           STATUSES,
           confirmDialog,
@@ -185,28 +238,65 @@
           if (!application) {
             applicationBox.innerHTML = `
               <p class="text-muted-soft">You haven't tracked an application for this job yet.</p>
-              <button type="button" class="btn btn-primary w-100" id="trackBtn"><i class="bi bi-check2-circle me-1"></i>I applied</button>`;
+              <button type="button" class="btn btn-primary w-100" id="trackBtn"><i class="bi bi-plus-circle me-1"></i>Track this job</button>`;
             document.getElementById("trackBtn").addEventListener("click", openApplicationForm);
             return;
           }
           applicationBox.innerHTML = `
             <div class="mb-3">${statusBadge(application.current_status)}</div>
             <dl class="detail-list mb-3">
-              <dt>Applied</dt><dd>${formatDate(application.date_applied)}</dd>
+              <dt>${application.current_status === "Wishlist" ? "Saved on" : "Applied"}</dt><dd>${formatDate(application.date_applied)}</dd>
               <dt>Interviews</dt><dd>${application.interview_rounds} round${application.interview_rounds === 1 ? "" : "s"}</dd>
             </dl>
+            ${application.notes ? `<p class="small mb-3" style="white-space: pre-wrap">${escapeHtml(application.notes)}</p>` : ""}
+            <div id="historyBox" class="mb-3"></div>
             <div class="d-grid gap-2">
               <button type="button" class="btn btn-outline-primary" id="updateBtn"><i class="bi bi-pencil me-1"></i>Update</button>
-              <a class="btn btn-link" href="/">Open dashboard</a>
+              <a class="btn btn-link" href="/">See all my applications</a>
             </div>`;
           document.getElementById("updateBtn").addEventListener("click", openApplicationForm);
+          loadHistory();
         }
+
+        // Status timeline from GET /api/applications/{id}/history, newest at the top.
+        async function loadHistory() {
+          const historyBox = document.getElementById("historyBox");
+          try {
+            const changes = await apiFetch(`/api/applications/${application.application_id}/history`);
+            if (changes.length === 0) {
+              return;
+            }
+            const items = [...changes]
+              .reverse()
+              .map((change) => {
+                const when = new Date(change.changed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                const what = change.from_status
+                  ? `${escapeHtml(change.from_status)} → <strong>${escapeHtml(change.to_status ?? "No status")}</strong>`
+                  : `Started as <strong>${escapeHtml(change.to_status ?? "No status")}</strong>`;
+                return `<li class="small mb-1"><span class="text-muted-soft">${when}</span> · ${what}</li>`;
+              })
+              .join("");
+            historyBox.innerHTML = `<p class="section-title mb-2">History</p><ul class="list-unstyled mb-0">${items}</ul>`;
+          } catch {
+            // The history is extra information; the rest of the box still works without it.
+          }
+        }
+
+        // Moving a Wishlist item on (e.g. to Applied) means you applied today: suggest today's date,
+        // unless the date was already changed by hand. It can still be edited before saving.
+        applicationForm.current_status.addEventListener("change", () => {
+          const leavingWishlist = application?.current_status === "Wishlist" && applicationForm.current_status.value !== "Wishlist";
+          if (leavingWishlist && applicationForm.date_applied.value === application.date_applied) {
+            applicationForm.date_applied.value = todayISO();
+          }
+        });
 
         function openApplicationForm() {
           formError.classList.add("d-none");
           applicationForm.date_applied.value = application?.date_applied ?? todayISO();
           applicationForm.current_status.value = application?.current_status ?? "Applied";
           applicationForm.interview_rounds.value = application?.interview_rounds ?? 0;
+          applicationForm.notes.value = application?.notes ?? "";
           document.getElementById("applicationModalLabel").textContent = application ? "Update application" : "Track application";
           showModal("applicationModal");
         }
@@ -218,6 +308,8 @@
             date_applied: applicationForm.date_applied.value,
             current_status: applicationForm.current_status.value,
             interview_rounds: Number(applicationForm.interview_rounds.value),
+            // An empty box clears the notes.
+            notes: applicationForm.notes.value.trim() || null,
           };
           setButtonLoading(submitButton, true);
           try {
@@ -251,6 +343,65 @@
             window.location.href = "/jobs";
           } catch (error) {
             showToast(error.message, "danger");
+          }
+        });
+
+        /* ---------- Skills & locations ---------- */
+
+        const detailsForm = document.getElementById("detailsForm");
+        const detailsError = detailsForm.querySelector(".form-error");
+        // Keys match the lists in GET /api/jobs/{id}/details.
+        const pickers = {
+          locations: createPicker(document.getElementById("locationsPicker"), { endpoint: "/api/locations", noun: "location" }),
+          work_modes: createPicker(document.getElementById("workModesPicker"), { endpoint: "/api/work-modes", noun: "work mode" }),
+          skills: createPicker(document.getElementById("skillsPicker"), { endpoint: "/api/skills", noun: "skill", extra: "skillType" }),
+          education: createPicker(document.getElementById("educationPicker"), { endpoint: "/api/education", noun: "education requirement", extra: "note" }),
+          sources: createPicker(document.getElementById("sourcesPicker"), { endpoint: "/api/sources", noun: "site, e.g. LinkedIn" }),
+        };
+        let pickersLoaded = false;
+
+        document.getElementById("editDetailsBtn").addEventListener("click", async (event) => {
+          const button = event.currentTarget;
+          setButtonLoading(button, true, "Loading...");
+          try {
+            // The pickers' option lists only need loading once; the job's current details every time.
+            const [details] = await Promise.all([
+              apiFetch(`${jobPath}/details`),
+              pickersLoaded || Promise.all(Object.values(pickers).map((picker) => picker.load())),
+            ]);
+            pickersLoaded = true;
+            for (const [key, picker] of Object.entries(pickers)) {
+              picker.setSelected(details[key]);
+            }
+            detailsError.classList.add("d-none");
+            showModal("detailsModal");
+          } catch (error) {
+            showToast(error.message, "danger");
+          } finally {
+            setButtonLoading(button, false);
+          }
+        });
+
+        detailsForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const submitButton = detailsForm.querySelector("[type=submit]");
+          const ids = (picker) => picker.getSelected().map((item) => item.id);
+          const body = {
+            location_ids: ids(pickers.locations),
+            work_mode_ids: ids(pickers.work_modes),
+            source_ids: ids(pickers.sources),
+            skills: pickers.skills.getSelected().map((item) => ({ skill_id: item.id, skill_type: item.skill_type })),
+            education: pickers.education.getSelected().map((item) => ({ education_id: item.id, note: item.note })),
+          };
+          setButtonLoading(submitButton, true);
+          try {
+            await apiFetch(`${jobPath}/details`, { method: "PUT", body });
+            queueToast("Skills & locations saved");
+            window.location.reload();
+          } catch (error) {
+            detailsError.textContent = error.message;
+            detailsError.classList.remove("d-none");
+            setButtonLoading(submitButton, false);
           }
         });
 

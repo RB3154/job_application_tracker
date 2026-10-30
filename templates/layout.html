@@ -56,13 +56,14 @@
                     </button>
                     <div class="collapse navbar-collapse" id="navbarToggle">
                         <div class="navbar-nav me-auto gap-md-1">
-                            <a class="nav-link {% if path == '/' %}active{% endif %}"
+                            <!-- Only for logged-in users: everything here is private to them. -->
+                            <a class="nav-link d-none {% if path == '/' %}active{% endif %}" data-logged-in-only
                                {% if path == '/' %}aria-current="page"{% endif %}
-                               href="{{ url_for('home') }}">Dashboard</a>
-                            <a class="nav-link {% if path.startswith('/jobs') %}active{% endif %}"
+                               href="{{ url_for('home') }}">My applications</a>
+                            <a class="nav-link d-none {% if path.startswith('/jobs') %}active{% endif %}" data-logged-in-only
                                {% if path.startswith('/jobs') %}aria-current="page"{% endif %}
                                href="{{ url_for('jobs_page') }}">Jobs</a>
-                            <a class="nav-link {% if path.startswith('/companies') %}active{% endif %}"
+                            <a class="nav-link d-none {% if path.startswith('/companies') %}active{% endif %}" data-logged-in-only
                                {% if path.startswith('/companies') %}aria-current="page"{% endif %}
                                href="{{ url_for('companies_page') }}">Companies</a>
                         </div>
@@ -77,6 +78,12 @@
                                         <i class="bi bi-plus-lg"></i> Add
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-md-end">
+                                        <li>
+                                            <button class="dropdown-item" type="button" data-open-form="application">
+                                                <i class="bi bi-send me-2"></i>Application
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
                                         <li>
                                             <button class="dropdown-item" type="button" data-open-form="job">
                                                 <i class="bi bi-briefcase me-2"></i>New job
@@ -198,20 +205,26 @@
         <!-- Navbar login state, the Add menu and toasts queued by the previous page -->
         <script type="module">
             import { getCurrentUser } from "/static/js/api.js";
-            import { openCompanyForm, openJobForm } from "/static/js/forms.js";
+            import { openCompanyForm, openJobForm, openQuickApplicationForm } from "/static/js/forms.js";
             import { avatarHtml, showQueuedToast } from "/static/js/utils.js";
 
             showQueuedToast();
 
-            // Any button with data-open-form="job" or "company" opens that form (data-company-id preselects a company).
-            document.querySelectorAll("[data-open-form]").forEach((button) => {
-                button.addEventListener("click", () => {
-                    if (button.dataset.openForm === "job") {
-                        openJobForm(null, { companyId: button.dataset.companyId });
-                    } else {
-                        openCompanyForm();
-                    }
-                });
+            // Any button with data-open-form="application", "job" or "company" opens that form
+            // (data-company-id preselects a company in the job form). One listener on the whole page,
+            // so buttons that JavaScript adds later (e.g. the dashboard's empty state) work too.
+            document.addEventListener("click", (event) => {
+                const button = event.target.closest("[data-open-form]");
+                if (!button) {
+                    return;
+                }
+                if (button.dataset.openForm === "application") {
+                    openQuickApplicationForm();
+                } else if (button.dataset.openForm === "job") {
+                    openJobForm(null, { companyId: button.dataset.companyId });
+                } else {
+                    openCompanyForm();
+                }
             });
 
             const user = await getCurrentUser();
@@ -220,7 +233,7 @@
                 document.getElementById("loggedOutNav").classList.replace("d-flex", "d-none");
                 document.getElementById("navUsername").textContent = user.username;
                 document.getElementById("navAvatar").innerHTML = avatarHtml(user, 28);
-                // Pages mark buttons that need a login (New job, Edit, Delete...) with data-logged-in-only.
+                // The navbar links marked data-logged-in-only only make sense when logged in.
                 document.querySelectorAll("[data-logged-in-only]").forEach((element) => element.classList.remove("d-none"));
             }
         </script>

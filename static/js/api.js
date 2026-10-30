@@ -16,8 +16,18 @@ export function clearToken() {
   userPromise = null;
 }
 
-export function logout() {
+// End the session everywhere: the login cookie that pages use (server) and the token (this browser).
+export async function endSession() {
+  try {
+    await fetch("/api/users/logout", { method: "POST" });
+  } catch {
+    // Offline: the cookie expires on its own together with the token.
+  }
   clearToken();
+}
+
+export async function logout() {
+  await endSession();
   window.location.href = "/";
 }
 

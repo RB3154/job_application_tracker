@@ -259,6 +259,7 @@ a.job-title:hover {
   background: currentColor;
 }
 
+.status-wishlist { color: #9a3c6b; background: #fbe9f2; }
 .status-applied { color: #3b4cc0; background: #e8ebfc; }
 .status-screening { color: #7a3fb8; background: #f3eafc; }
 .status-interview { color: #a35a00; background: #fff2dc; }
@@ -267,6 +268,7 @@ a.job-title:hover {
 .status-rejected { color: #b42318; background: #fde8e6; }
 .status-withdrawn { color: #5d6275; background: #eceef3; }
 
+[data-bs-theme="dark"] .status-wishlist { color: #f5a6cb; background: #3d1f2e; }
 [data-bs-theme="dark"] .status-applied { color: #a9b2ff; background: #23284d; }
 [data-bs-theme="dark"] .status-screening { color: #d2b0f7; background: #33244a; }
 [data-bs-theme="dark"] .status-interview { color: #ffc56b; background: #3d2e14; }
@@ -466,3 +468,91 @@ a.job-title:hover {
 .toast-container {
   z-index: 1090;
 }
+
+/* Optional, folded sections in the Add application form */
+.form-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.9rem;
+}
+
+.form-section summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Lookup pickers (static/js/pickers.js): one row per chosen location, skill, etc. */
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  margin-bottom: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.picker-name {
+  flex-grow: 1;
+  font-weight: 500;
+}
+
+.picker-item .picker-extra {
+  width: auto;
+  max-width: 50%;
+}
+
+/* Dashboard board view (static/js/dashboard.js): one column per status, scrolls sideways on small screens. */
+.board {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  align-items: flex-start;
+}
+
+.board-column {
+  flex: 0 0 15rem;
+  background: var(--color-bg-body);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.board-column.folded {
+  flex-basis: 9rem;
+}
+
+.board-column-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.board-column-title .count {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.board-card {
+  background: var(--color-bg-content);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.board-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* "Needs attention" panel above the dashboard */
+.attention-item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+}
+

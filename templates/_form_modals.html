@@ -1,8 +1,8 @@
-<!-- Company and job forms (create + edit). The JavaScript for them is in static/js/forms.js. -->
+<!-- Company and job forms (create + edit) and the quick "Add application" form.
+     The JavaScript for them is in static/js/forms.js. -->
 <div class="modal fade" id="companyModal" tabindex="-1" aria-labelledby="companyModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content">
-            <form id="companyForm">
+        <form class="modal-content" id="companyForm">
                 <div class="modal-header">
                     <h5 class="modal-title" id="companyModalLabel">New company</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -12,11 +12,6 @@
                     <div class="mb-3">
                         <label for="companyName" class="form-label">Company name</label>
                         <input type="text" class="form-control" id="companyName" name="company_name" required maxlength="255">
-                    </div>
-                    <div class="mb-3">
-                        <label for="companyId" class="form-label">Company ID</label>
-                        <input type="text" class="form-control" id="companyId" name="company_id" required maxlength="100">
-                        <div class="form-text">A short unique id used in the URL. Filled in from the name; you can change it.</div>
                     </div>
                     <div class="mb-3">
                         <label for="companySite" class="form-label">Website <span class="text-muted-soft">(optional)</span></label>
@@ -32,13 +27,11 @@
                     <button type="submit" class="btn btn-primary">Create company</button>
                 </div>
             </form>
-        </div>
     </div>
 </div>
 <div class="modal fade" id="jobModal" tabindex="-1" aria-labelledby="jobModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <form id="jobForm">
+        <form class="modal-content" id="jobForm">
                 <div class="modal-header">
                     <h5 class="modal-title" id="jobModalLabel">New job</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -54,14 +47,9 @@
                             <label for="jobCompany" class="form-label">Company</label>
                             <select class="form-select" id="jobCompany" name="company_id" required></select>
                         </div>
-                        <div class="col-md-7">
+                        <div class="col-12">
                             <label for="jobUrl" class="form-label">Job posting URL</label>
                             <input type="url" class="form-control" id="jobUrl" name="job_url" required placeholder="https://">
-                        </div>
-                        <div class="col-md-5">
-                            <label for="jobId" class="form-label">Job ID</label>
-                            <input type="text" class="form-control" id="jobId" name="job_id" required maxlength="100">
-                            <div class="form-text">Filled in for you; must be unique.</div>
                         </div>
                         <div class="col-6">
                             <label for="jobPostingDate" class="form-label">Posted on</label>
@@ -116,8 +104,8 @@
                             <input type="text" class="form-control" id="jobSalaryText" name="salary_text" placeholder="e.g. ₹12–18 LPA">
                         </div>
                         <div class="col-12">
-                            <label for="jobDescription" class="form-label">Job description</label>
-                            <textarea class="form-control" id="jobDescription" name="JD" rows="6" required></textarea>
+                            <label for="jobDescription" class="form-label">Job description <span class="text-muted-soft">(optional)</span></label>
+                            <textarea class="form-control" id="jobDescription" name="JD" rows="6"></textarea>
                         </div>
                     </div>
                 </div>
@@ -126,6 +114,121 @@
                     <button type="submit" class="btn btn-primary">Create job</button>
                 </div>
             </form>
-        </div>
+    </div>
+</div>
+<!-- One-step "Add application" form. The JavaScript for it is in static/js/forms.js. -->
+<div class="modal fade" id="quickApplicationModal" tabindex="-1" aria-labelledby="quickApplicationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <form class="modal-content" id="quickApplicationForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="quickApplicationModalLabel">Add application</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger form-error d-none" role="alert"></div>
+                    <div class="mb-3">
+                        <label for="quickCompany" class="form-label">Company</label>
+                        <input type="text" class="form-control" id="quickCompany" name="company_name" list="quickCompanyOptions"
+                               required maxlength="255" autocomplete="off" placeholder="e.g. Google">
+                        <datalist id="quickCompanyOptions"></datalist>
+                        <div class="form-text">Pick a company from the list, or type a new one and it will be added.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quickRole" class="form-label">Role</label>
+                        <input type="text" class="form-control" id="quickRole" name="role" required maxlength="255" placeholder="e.g. Backend Engineer">
+                    </div>
+                    <div class="mb-3">
+                        <label for="quickJobUrl" class="form-label">Job posting link</label>
+                        <input type="url" class="form-control" id="quickJobUrl" name="job_url" required placeholder="https://">
+                        <div class="form-text">If this job is already saved, the saved one is used.</div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label for="quickStatus" class="form-label">Status</label>
+                            <select class="form-select" id="quickStatus" name="current_status"></select>
+                        </div>
+                        <div class="col-6">
+                            <label for="quickDate" class="form-label">Date applied</label>
+                            <input type="date" class="form-control" id="quickDate" name="date_applied">
+                            <div class="form-text">For Wishlist, the date you saved it.</div>
+                        </div>
+                    </div>
+                    <div class="mb-1">
+                        <label for="quickNotes" class="form-label">Notes <span class="text-muted-soft">(optional, only you see them)</span></label>
+                        <textarea class="form-control" id="quickNotes" name="notes" rows="3" maxlength="5000"></textarea>
+                    </div>
+                    <!-- Optional extras, folded away; leave them closed to just track the application. -->
+                    <details class="form-section mt-3">
+                        <summary>Job details <span class="text-muted-soft">(optional)</span></summary>
+                        <div class="row g-3 mt-1">
+                            <div class="col-6">
+                                <label for="quickPosted" class="form-label">Posted on</label>
+                                <input type="date" class="form-control" id="quickPosted" name="job_posting_date">
+                            </div>
+                            <div class="col-6">
+                                <label for="quickDeadline" class="form-label">Apply by</label>
+                                <input type="date" class="form-control" id="quickDeadline" name="application_deadline">
+                            </div>
+                            <div class="col-4">
+                                <label for="quickExpMin" class="form-label">Min years</label>
+                                <input type="number" class="form-control" id="quickExpMin" name="exp_min" min="0" max="999" step="0.5">
+                            </div>
+                            <div class="col-4">
+                                <label for="quickExpMax" class="form-label">Max years</label>
+                                <input type="number" class="form-control" id="quickExpMax" name="exp_max" min="0" max="999" step="0.5">
+                            </div>
+                            <div class="col-4">
+                                <label for="quickExpText" class="form-label">As written</label>
+                                <input type="text" class="form-control" id="quickExpText" name="exp_text" placeholder="e.g. 2+ years">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="quickSalaryMin" class="form-label">Salary min</label>
+                                <input type="number" class="form-control" id="quickSalaryMin" name="salary_min" min="0" step="any">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="quickSalaryMax" class="form-label">Salary max</label>
+                                <input type="number" class="form-control" id="quickSalaryMax" name="salary_max" min="0" step="any">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="quickCurrency" class="form-label">Currency</label>
+                                <input type="text" class="form-control text-uppercase" id="quickCurrency" name="salary_currency" minlength="3" maxlength="3" placeholder="e.g. INR">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="quickPeriod" class="form-label">Per</label>
+                                <select class="form-select" id="quickPeriod" name="salary_period">
+                                    <option value=""></option>
+                                    <option value="year">year</option>
+                                    <option value="month">month</option>
+                                    <option value="week">week</option>
+                                    <option value="hour">hour</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="quickSalaryText" class="form-label">Salary as written</label>
+                                <input type="text" class="form-control" id="quickSalaryText" name="salary_text" placeholder="e.g. ₹12–18 LPA">
+                            </div>
+                            <div class="col-12">
+                                <label for="quickJD" class="form-label">Job description</label>
+                                <textarea class="form-control" id="quickJD" name="JD" rows="4"></textarea>
+                            </div>
+                        </div>
+                    </details>
+                    <details class="form-section mt-3">
+                        <summary>Company details <span class="text-muted-soft">(optional)</span></summary>
+                        <div class="mt-3">
+                            <label for="quickCompanySite" class="form-label">Website</label>
+                            <input type="url" class="form-control" id="quickCompanySite" name="company_site" placeholder="https://">
+                        </div>
+                        <div class="mt-3">
+                            <label for="quickCompanyDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="quickCompanyDescription" name="company_description" rows="3"></textarea>
+                        </div>
+                    </details>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add application</button>
+                </div>
+            </form>
     </div>
 </div>

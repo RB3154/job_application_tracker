@@ -39,9 +39,15 @@
           return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
         }
 
-        // Already logged in? Skip the form.
+        // Already logged in? Skip the form. Pages need the login cookie too, which browsers that logged in
+        // before it existed don't have yet, so copy the token into it first (otherwise the page sends us back here).
         if (await getCurrentUser()) {
-          window.location.replace(nextPage());
+          try {
+            await apiFetch("/api/users/session", { method: "POST" });
+            window.location.replace(nextPage());
+          } catch {
+            // Couldn't set the cookie: stay here and log in with the form, which sets it.
+          }
         }
 
         loginForm.addEventListener("submit", async (event) => {

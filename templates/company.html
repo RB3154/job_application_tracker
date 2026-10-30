@@ -23,10 +23,13 @@
                 </div>
             </div>
             <div class="d-flex gap-2 align-items-start">
-                <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="editCompanyBtn" data-logged-in-only>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="editCompanyBtn">
                     <i class="bi bi-pencil"></i> Edit
                 </button>
-                <button type="button" class="btn btn-outline-danger btn-sm d-none" id="deleteCompanyBtn" data-logged-in-only>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="editLocationsBtn">
+                    <i class="bi bi-geo-alt"></i> Locations
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" id="deleteCompanyBtn">
                     <i class="bi bi-trash"></i> Delete
                 </button>
             </div>
@@ -38,10 +41,9 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h5 mb-0">Jobs at {{ company.company_name }}</h2>
         <button type="button"
-                class="btn btn-primary btn-sm d-none"
+                class="btn btn-primary btn-sm"
                 data-open-form="job"
-                data-company-id="{{ company.company_id }}"
-                data-logged-in-only>
+                data-company-id="{{ company.company_id }}">
             <i class="bi bi-plus-lg"></i> Add job
         </button>
     </div>
@@ -53,14 +55,76 @@
             <p class="mb-0">No jobs saved for this company yet.</p>
         </div>
     {% endfor %}
+    <!-- Company locations modal. The picker inside is built by static/js/pickers.js. -->
+    <div class="modal fade" id="locationsModal" tabindex="-1" aria-labelledby="locationsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <form class="modal-content" id="locationsForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="locationsModalLabel">{{ company.company_name }} locations</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger form-error d-none" role="alert"></div>
+                        <p class="text-muted-soft small">Pick from the list as you type, or type a new name to add it.</p>
+                        <div id="companyLocationsPicker"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+        </div>
+    </div>
 {% endblock content %}
 {% block scripts %}
     <script type="module">
         import { apiFetch } from "/static/js/api.js";
         import { openCompanyForm } from "/static/js/forms.js";
-        import { confirmDialog, queueToast, showToast } from "/static/js/utils.js";
+        import { createPicker } from "/static/js/pickers.js";
+        import { confirmDialog, queueToast, setButtonLoading, showModal, showToast } from "/static/js/utils.js";
 
         const company = {{ company_data | tojson }};
+        const locationsPath = `/api/companies/${encodeURIComponent(company.company_id)}/locations`;
+
+        const locationsForm = document.getElementById("locationsForm");
+        const locationsError = locationsForm.querySelector(".form-error");
+        const locationsPicker = createPicker(document.getElementById("companyLocationsPicker"), {
+          endpoint: "/api/locations",
+          noun: "location",
+        });
+        let pickerLoaded = false;
+
+        document.getElementById("editLocationsBtn").addEventListener("click", async (event) => {
+          const button = event.currentTarget;
+          setButtonLoading(button, true, "Loading...");
+          try {
+            const [locations] = await Promise.all([apiFetch(locationsPath), pickerLoaded || locationsPicker.load()]);
+            pickerLoaded = true;
+            locationsPicker.setSelected(locations);
+            locationsError.classList.add("d-none");
+            showModal("locationsModal");
+          } catch (error) {
+            showToast(error.message, "danger");
+          } finally {
+            setButtonLoading(button, false);
+          }
+        });
+
+        locationsForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const submitButton = locationsForm.querySelector("[type=submit]");
+          setButtonLoading(submitButton, true);
+          try {
+            const location_ids = locationsPicker.getSelected().map((item) => item.id);
+            await apiFetch(locationsPath, { method: "PUT", body: { location_ids } });
+            queueToast("Locations saved");
+            window.location.reload();
+          } catch (error) {
+            locationsError.textContent = error.message;
+            locationsError.classList.remove("d-none");
+            setButtonLoading(submitButton, false);
+          }
+        });
 
         document.getElementById("editCompanyBtn").addEventListener("click", () => openCompanyForm(company));
 
