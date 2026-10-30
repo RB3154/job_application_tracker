@@ -21,7 +21,7 @@ layer, and CRUD API.
 - **Private**: log in to use it; your companies, jobs, lists and applications
   are visible only to you.
 - **Companies and jobs**: your own, with search and filters
-  (text, location, skill, work mode, still open).
+  (text, location, skill, work mode).
 - **Lookup lists**: locations, work modes, skills (required or nice to have),
   education requirements and sources, picked as you type and attached to jobs
   and companies.

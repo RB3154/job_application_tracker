@@ -35,7 +35,7 @@ job and **Locations** on a company. Those open pickers where you choose from
 your lists as you type, or type a new name to add it.
 
 The jobs and companies filters are plain GET forms, so the filters end up in
-the address (`/jobs?skill_id=7&open_only=true`) and can be bookmarked.
+the address (`/jobs?skill_id=7&work_mode_id=2`) and can be bookmarked.
 
 ### Two ways a page gets its data
 
