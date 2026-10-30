@@ -1,8 +1,9 @@
 # Job Application Tracker
 
-A REST API for managing users, job applications, companies, and job
-postings, with a browser frontend (Jinja2 templates + JavaScript) built on top
-of it.
+A private, login-only tracker for your own job applications: log in, record
+where you applied, and follow each application from Wishlist to Offer. Nobody
+else can see your data. It is a FastAPI REST API with a browser frontend
+(Jinja2 templates + JavaScript) built on top of it.
 
 This project is being built incrementally while learning and applying modern
 Python backend development concepts with FastAPI, Pydantic, SQLAlchemy,
@@ -17,113 +18,49 @@ layer, and CRUD API.
 
 ## Features
 
-### Company Management
+- **Private**: log in to use it; your companies, jobs, lists and applications
+  are visible only to you.
+- **Companies and jobs**: your own, with search and filters
+  (text, location, skill, work mode, still open).
+- **Lookup lists**: locations, work modes, skills (required or nice to have),
+  education requirements and sources, picked as you type and attached to jobs
+  and companies.
+- **Applications**: each user tracks their own, with a status (Wishlist,
+  Applied, Screening, Interview, Offer, Accepted, Rejected, Withdrawn), date,
+  interview rounds, private notes, and an automatic status history.
+- **Add application**: one form needs just the company, role and link; the
+  company and job are found or created automatically. Optional, folded
+  "Job details" and "Company details" sections save salary, experience,
+  deadline, description and website too, if you want.
+- **Accounts**: register, log in (JWT), profile picture, change password
+  (logs out other devices), and password reset by email.
+- **Security**: Argon2 password hashes, rate-limited login and password reset,
+  case-insensitive unique usernames and emails, an HttpOnly login cookie for
+  pages, and every request limited to your own data (anyone else's is `404`).
+- **Dashboard**: a table or a board with a column per status, and a "Needs
+  attention" panel for wishlist deadlines and applications waiting too long
+  for news.
+- **Frontend**: Jinja2 pages with plain JavaScript (dashboard, jobs, companies,
+  account) built on top of the same API.
 
-CRUD operations for companies:
-
-- Create a company
-- Retrieve companies one page at a time (see [Pagination](#pagination))
-- Retrieve a company by ID
-- Replace a company using PUT
-- Partially update a company using PATCH
-- Delete a company
-
----
-
-### Job Management
-
-CRUD operations for job postings:
-
-- Create a job
-- Retrieve jobs one page at a time (see [Pagination](#pagination))
-- Retrieve a job by ID
-- Replace a job using PUT
-- Partially update a job using PATCH
-- Delete a job
-
-Jobs include information such as:
-
-- Role
-- Job description
-- Job URL
-- Posting date
-- Application deadline
-- Minimum and maximum experience
-- Salary information
-- Company
+See [docs/api.md](docs/api.md#features) for every rule in detail.
 
 ---
 
-### User Management
+## Documentation
 
-Operations for users:
+The details live in `docs/`:
 
-- Register a user (with a password)
-- Log in with email and password to receive a JWT access token
-- Retrieve the logged-in user (`/me`)
-- Retrieve any user's public profile (`/{user_id}`: id and username only)
-- Partially update the logged-in user using PATCH `/me`
-- Delete the logged-in user with DELETE `/me` (their applications and profile
-  picture are deleted with them)
-- Upload a profile picture with PATCH `/me/picture` (cropped to a 300x300 JPEG,
-  max 5 MB)
-- Remove the profile picture with DELETE `/me/picture`
-- Change the password with PATCH `/me/password` (needs the current password)
-- Reset a forgotten password: POST `/forgot-password` emails a one-time reset
-  token, and POST `/reset-password` uses it to set a new password
+| File | What's inside |
+| --- | --- |
+| [docs/api.md](docs/api.md) | Everything the `/api/...` endpoints do: resources and their rules, every endpoint, ownership, lookup lists, pagination, search and filters, PUT vs PATCH, and errors. |
+| [docs/architecture.md](docs/architecture.md) | How the code is organized: routers, the request flow, the async setup, `main.py`, settings, and what each file contains. |
+| [docs/database.md](docs/database.md) | The PostgreSQL schema, its constraints, the SQLAlchemy models and Pydantic schemas, and the Alembic migrations. |
+| [docs/auth.md](docs/auth.md) | Login, JWT tokens, logging out other devices, protected routes, rate limiting, and password reset. |
+| [docs/frontend.md](docs/frontend.md) | The Jinja2 + JavaScript pages: what each page does, how pages get their data, login in the browser, and the frontend files. |
 
-Users have:
-
-- Username (unique, checked case-insensitively)
-- Email (unique, validated, stored in lowercase)
-- Password (at least 8 characters, stored only as an Argon2 hash)
-
-A user can only change or delete their own account. Emails are only shown to
-the user themselves.
-
-Each user owns their own applications. Companies and jobs are shared between
-all users.
-
----
-
-### Application Management
-
-CRUD operations for job applications (login required):
-
-- Create an application for the logged-in user
-- Retrieve the logged-in user's applications one page at a time (see
-  [Pagination](#pagination))
-- Retrieve an application by ID
-- Replace an application using PUT
-- Partially update an application using PATCH
-- Delete an application
-
-Applications track:
-
-- User
-- Job
-- Date applied
-- Current application status
-- Number of interview rounds so far (`interview_rounds`, starts at `0`)
-
-Application IDs are generated by the database. A user can apply to a given job
-only once, but different users can apply to the same job.
-
-Users can only see and change their own applications. Requesting another
-user's application returns `403 Forbidden`; an application that doesn't exist
-returns `404 Not Found`.
-
-Supported application statuses:
-
-```text
-Applied
-Screening
-Interview
-Rejected
-Offer
-Accepted
-Withdrawn
-```
+Interactive API docs are also available while the app runs, at `/docs`
+(Swagger UI) and `/redoc`.
 
 ---
 
@@ -145,1325 +82,18 @@ Withdrawn
 | pwdlib (Argon2) | Password hashing |
 | Pillow | Profile picture cropping and resizing |
 | aiosmtplib | Sending password reset emails asynchronously over SMTP |
+| slowapi | Rate limiting login and password reset requests |
 | uv | Python package and environment management |
-| Jinja2 | HTML templates for the frontend pages (via `fastapi[standard]`) |
+| Jinja2 | HTML templates for the frontend pages |
 | Bootstrap 5 + Bootstrap Icons | Frontend styling and components (loaded from a CDN) |
-
----
-
-## Project Architecture
-
-The backend is organized around four primary API resources:
-
-```text
-Client
-   |
-   v
-FastAPI Application
-   |
-   +-------------------+
-   |                   |
-   v                   v
-Routers             Exception Handlers
-   |
-   +-----------+-----------+-----------+
-   |           |           |           |
-   v           v           v           v
-Companies    Jobs     Applications   Users
-   |           |           |           |
-   +-----------+-----------+-----------+
-             |
-             v
-      Async Database Layer
-             |
-             v
-       SQLAlchemy ORM
-             |
-             v
-           asyncpg
-             |
-             v
-        PostgreSQL
-```
-
-The FastAPI application uses `APIRouter` to organize API endpoints into
-resource-specific modules.
-
-The current router structure is:
-
-```text
-routers/
-├── __init__.py
-├── helpers.py
-├── companies.py
-├── jobs.py
-├── applications.py
-├── users.py
-└── pages.py
-```
-
-Each resource router contains the API endpoints associated with that resource.
-`pages.py` contains the HTML pages of the frontend (see [Frontend](#frontend)).
-
-Shared database and validation helpers are kept in `routers/helpers.py`.
-
----
-
-## API Router Architecture
-
-The API routes are separated from the main FastAPI application using
-FastAPI's `APIRouter`.
-
-### Company Router
-
-```text
-routers/companies.py
-```
-
-Contains all company CRUD endpoints.
-
-### Job Router
-
-```text
-routers/jobs.py
-```
-
-Contains all job CRUD endpoints.
-
-### Application Router
-
-```text
-routers/applications.py
-```
-
-Contains all application CRUD endpoints.
-
-### User Router
-
-```text
-routers/users.py
-```
-
-Contains registration, login (`/token`), forgot/reset password
-(`/forgot-password`, `/reset-password`), the logged-in user's account
-endpoints (`/me`, including `/me/password`), and public profiles
-(`/{user_id}`).
-
-### Shared Router Helpers
-
-```text
-routers/helpers.py
-```
-
-Contains shared asynchronous database and validation helpers used by the
-resource routers.
-
-Examples include:
-
-- Resource lookup helpers (application lookup is scoped to the logged-in user)
-- Database conflict handling
-- Job URL uniqueness validation
-- One-application-per-user-per-job validation
-- Username and email uniqueness validation
-
-The routers are connected to the FastAPI application through
-`app.include_router()`.
-
-The API prefixes are:
-
-```text
-/api/companies
-/api/jobs
-/api/applications
-/api/users
-```
-
-Router tags are also used to organize the endpoints in FastAPI's interactive
-API documentation.
-
----
-
-## API Request Flow
-
-A typical API request follows this flow:
-
-```text
-Client
-   |
-   v
-FastAPI Application
-   |
-   v
-APIRouter
-   |
-   v
-Route Handler
-   |
-   v
-Pydantic Validation
-   |
-   v
-AsyncSession
-   |
-   v
-SQLAlchemy Async ORM
-   |
-   v
-asyncpg
-   |
-   v
-PostgreSQL
-```
-
----
-
-## Async Architecture
-
-The backend uses SQLAlchemy's asynchronous APIs for PostgreSQL database
-operations.
-
-The main async components are:
-
-- `create_async_engine`
-- `AsyncSession`
-- `async_sessionmaker`
-- `asyncpg`
-- Async FastAPI route handlers
-- Async database dependencies
-- Async FastAPI lifespan
-- Async database operations
-
-The general database flow is:
-
-```text
-Client
-   |
-   v
-FastAPI
-   |
-   v
-Async Route Handler
-   |
-   v
-AsyncSession
-   |
-   v
-SQLAlchemy Async ORM
-   |
-   v
-asyncpg
-   |
-   v
-PostgreSQL
-```
-
-### Synchronous → Asynchronous Conversion
-
-The database layer uses the following async equivalents:
-
-```text
-Session
-   ↓
-AsyncSession
-
-create_engine()
-   ↓
-create_async_engine()
-
-sessionmaker()
-   ↓
-async_sessionmaker()
-
-PostgreSQL synchronous driver
-   ↓
-asyncpg
-```
-
-Database operations that require asynchronous execution are awaited:
-
-```python
-await db.get(...)
-await db.execute(...)
-await db.commit()
-await db.rollback()
-await db.refresh(...)
-await db.delete(...)
-```
-
-Operations that are synchronous remain synchronous.
-
-For example:
-
-```python
-db.add(instance)
-```
-
-does not require `await`.
-
----
-
-## Application Entry Point
-
-The FastAPI application is defined in:
-
-```text
-main.py
-```
-
-`main.py` is responsible for application-level configuration and wiring.
-
-It currently contains:
-
-- FastAPI application creation
-- Async lifespan configuration
-- Router imports
-- Router registration
-- The `/static` (CSS/JS) and `/media` (uploaded pictures) file mounts
-- Exception handlers
-
-The resource-specific API route implementations are kept inside the
-corresponding router modules.
-
-The application includes the routers using:
-
-```python
-app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
-app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
-app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
-app.include_router(users.router, prefix="/api/users", tags=["users"])
-app.include_router(pages.router)
-```
-
-This keeps the public API URLs unchanged while separating the internal route
-organization. The pages router has no prefix, so its pages live at `/`,
-`/jobs`, `/login`, and so on.
-
----
-
-## FastAPI Lifespan
-
-The application uses FastAPI's lifespan mechanism for startup and shutdown
-operations.
-
-The app does **not** create tables on startup. The database schema is owned by
-Alembic: run `uv run alembic upgrade head` to create or update the tables
-(see [Alembic](#alembic)).
-
-Earlier versions ran `Base.metadata.create_all` on startup. That was removed
-because it only creates missing tables (it never changes existing ones), and a
-table made by `create_all` is unknown to Alembic, which makes later
-migrations fail.
-
-During shutdown, the async SQLAlchemy engine is disposed:
-
-```python
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    yield
-    await engine.dispose()
-```
-
----
-
-## API Documentation
-
-FastAPI automatically provides interactive API documentation.
-
-### Swagger UI
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-### ReDoc
-
-```text
-http://127.0.0.1:8000/redoc
-```
-
-### OpenAPI Schema
-
-```text
-http://127.0.0.1:8000/openapi.json
-```
-
-The API routers use tags so that related endpoints are grouped in the Swagger
-documentation.
-
----
-
-## API Endpoints
-
-The API currently exposes 23 operations across four primary resources.
-
-### Companies
-
-```text
-GET     /api/companies
-POST    /api/companies
-GET     /api/companies/{company_id}
-PUT     /api/companies/{company_id}
-PATCH   /api/companies/{company_id}
-DELETE  /api/companies/{company_id}
-```
-
-### Jobs
-
-```text
-GET     /api/jobs
-POST    /api/jobs
-GET     /api/jobs/{job_id}
-PUT     /api/jobs/{job_id}
-PATCH   /api/jobs/{job_id}
-DELETE  /api/jobs/{job_id}
-```
-
-### Applications
-
-```text
-GET     /api/applications
-POST    /api/applications
-GET     /api/applications/{application_id}
-PUT     /api/applications/{application_id}
-PATCH   /api/applications/{application_id}
-DELETE  /api/applications/{application_id}
-```
-
-All application endpoints require a valid access token. The owner is taken
-from the token, so creating an application only needs a `job_id`; the
-`application_id` is generated by the database.
-
-### Users
-
-```text
-POST    /api/users          (register, public)
-POST    /api/users/token    (log in, public)
-POST    /api/users/forgot-password   (public, emails a reset token)
-POST    /api/users/reset-password    (public, needs the emailed token)
-GET     /api/users/me           (login required)
-PATCH   /api/users/me           (login required)
-DELETE  /api/users/me           (login required)
-PATCH   /api/users/me/password  (login required, needs current password)
-PATCH   /api/users/me/picture   (login required, multipart file upload)
-DELETE  /api/users/me/picture   (login required)
-GET     /api/users/{user_id}    (public, username only)
-```
-
-Company and job `GET` endpoints are public. Creating, replacing, updating, and
-deleting companies or jobs requires login (any logged-in user).
-
----
-
-## Pagination
-
-The three list endpoints (`GET /api/companies`, `GET /api/jobs` and
-`GET /api/applications`) return one page at a time instead of every row.
-
-| Query parameter | Meaning | Default | Allowed |
-| --- | --- | --- | --- |
-| `skip` | How many rows to jump over | `0` | `0` or more |
-| `limit` | How many rows to return | `10` (`items_per_page`) | `1` to `100` |
-
-```text
-GET /api/jobs?skip=0&limit=10     → jobs 1–10
-GET /api/jobs?skip=10&limit=10    → jobs 11–20
-```
-
-These map straight to SQL `OFFSET` and `LIMIT`. Values outside the allowed
-range return `422`.
-
-Each response wraps the page in an object with the totals alongside:
-
-```json
-{
-  "jobs": [ ... ],
-  "total": 23,
-  "skip": 10,
-  "limit": 10,
-  "has_more": true
-}
-```
-
-The list key is `companies`, `jobs` or `applications`. `has_more` is `true`
-while `skip + (rows on this page) < total`, so a client can keep requesting the
-next page until it becomes `false`.
-
-Results are always sorted so pages never overlap or skip rows:
-
-| Endpoint | Order |
-| --- | --- |
-| Companies | `company_name` A–Z, then `company_id` |
-| Jobs | `job_posting_date` newest first, then `job_id` |
-| Applications | `date_applied` newest first, then `application_id` newest first |
-
----
-
-## PUT vs PATCH
-
-The API distinguishes between full replacement and partial updates.
-
-### PUT
-
-PUT performs a full replacement of the updateable fields.
-
-Example:
-
-```text
-PUT /api/companies/COMP1
-```
-
-The complete update payload is expected.
-
-### PATCH
-
-PATCH performs a partial update.
-
-Only fields included in the request are changed.
-
-Example:
-
-```text
-PATCH /api/companies/COMP1
-```
-
-with:
-
-```json
-{
-    "company_name": "Google India"
-}
-```
-
-Only the company name is changed.
-
-The implementation uses:
-
-```python
-model_dump(exclude_unset=True)
-```
-
-for PATCH requests so omitted fields are not overwritten.
-
----
-
-## Database
-
-The application uses PostgreSQL as its relational database.
-
-The database connection is configured through:
-
-```text
-DATABASE_URL
-```
-
-The value is loaded from `.env` by the shared `settings` object in
-`config.py` (see [Application Settings](#application-settings)).
-
-The SQLAlchemy database configuration is located in:
-
-```text
-database.py
-```
-
-The database layer provides:
-
-- Async PostgreSQL engine
-- SQLAlchemy `AsyncSession`
-- Async session factory
-- Declarative ORM base
-- Async FastAPI database-session dependency
-
-The PostgreSQL driver used by SQLAlchemy is:
-
-```text
-asyncpg
-```
-
-The SQLAlchemy connection URL is normalized to:
-
-```text
-postgresql+asyncpg
-```
-
-for asynchronous PostgreSQL operations.
-
----
-
-## Async Database Sessions
-
-The application creates database sessions using SQLAlchemy's
-`async_sessionmaker`.
-
-The FastAPI database dependency provides an `AsyncSession` to API routes.
-
-Conceptually:
-
-```text
-Incoming API request
-        |
-        v
-     get_db()
-        |
-        v
-    AsyncSession
-        |
-        v
-     API route
-        |
-        v
-Database operations
-        |
-        v
-   Session closed
-```
-
-The async session is managed using an asynchronous context manager so that the
-session lifecycle is handled automatically.
-
----
-
-## SQLAlchemy ORM
-
-The ORM models are defined in:
-
-```text
-models.py
-```
-
-The project uses SQLAlchemy 2.x style declarations including:
-
-```python
-Mapped
-mapped_column
-relationship
-```
-
-The ORM layer represents the application's relational database design.
-
----
-
-## Database Schema
-
-The database currently contains 16 tables:
-
-```text
-application
-company
-company_location
-education_requirement
-job
-job_education
-job_location
-job_skill
-job_source
-job_work_mode
-location
-password_reset_tokens
-skill
-source
-users
-work_mode
-```
-
-The main entities are:
-
-```text
-Company                 User
-   |                     |
-   | 1-to-many           | 1-to-many
-   v                     |
- Job                     |
-   |                     |
-   | 1-to-many           |
-   v                     v
-   +---> Application <---+
-```
-
-Each application belongs to exactly one user and one job. Jobs and companies
-are shared between users.
-
-Jobs also have many-to-many relationships with:
-
-- Locations
-- Work modes
-- Skills
-- Education requirements
-- Sources
-
-Companies have a many-to-many relationship with locations.
-
-The many-to-many relationships are represented using explicit junction tables.
-
----
-
-## Database Constraints
-
-The database schema contains relational constraints such as:
-
-- Primary keys
-- Foreign keys
-- Unique constraints
-- Composite primary keys
-- Check constraints
-- NOT NULL constraints
-- Default values
-- Indexes
-
-Examples include:
-
-### Job constraints
-
-```text
-application_deadline >= job_posting_date
-exp_min >= 0
-exp_max >= 0
-exp_max >= exp_min
-salary_min >= 0
-salary_max >= 0
-salary_max >= salary_min
-```
-
-`job_url` is unique.
-
-### Application constraints
-
-`application_id` is generated by the database.
-
-`user_id` references `users.id` with `ON DELETE CASCADE`, so deleting a user
-deletes their applications.
-
-The pair (`user_id`, `job_id`) is unique: each user can have at most one
-application per job.
-
-`interview_rounds` is required and defaults to `0` in the database
-(`server_default`). The API rejects negative values with `422`.
-
-Application status is restricted to:
-
-```text
-Applied
-Screening
-Interview
-Rejected
-Offer
-Accepted
-Withdrawn
-```
-
-### User constraints
-
-`username` and `email` are unique. The API also checks them
-case-insensitively and stores emails in lowercase.
-
-`password_hash` is required. Plain-text passwords are never stored.
-
-`image_file` is optional. It holds only the picture's filename; the picture
-itself is saved on disk in `media/profile_pics/`.
-
-### Password reset token constraints
-
-`token_hash` is unique and stores only the SHA-256 hash of the emailed token.
-`user_id` references `users.id` with `ON DELETE CASCADE`, so a user's reset
-tokens are deleted with them. `expires_at` is required.
-
-Foreign-key relationships are also validated before creating or updating
-dependent records.
-
----
-
-## Pydantic Schemas
-
-Request and response schemas are defined in:
-
-```text
-schemas.py
-```
-
-Current schemas include:
-
-### Company
-
-```text
-CompanyBase
-CompanyCreate
-CompanyResponse
-CompanyUpdate
-PaginatedCompaniesResponse
-```
-
-### Job
-
-```text
-JobBase
-JobCreate
-JobResponse
-JobUpdate
-PaginatedJobsResponse
-```
-
-### Application
-
-```text
-ApplicationBase
-ApplicationCreate
-ApplicationResponse
-ApplicationReplace
-ApplicationUpdate
-PaginatedApplicationsResponse
-```
-
-`ApplicationCreate` only takes the job and optional date/status/interview
-rounds; the owner is taken from the access token. A PUT that leaves out
-`interview_rounds` resets it to `0`, since PUT replaces the whole application. `ApplicationResponse` includes both
-`application_id` and `user_id`.
-
-The `Paginated...Response` schemas wrap one page of a list together with
-`total`, `skip`, `limit` and `has_more` (see [Pagination](#pagination)).
-
-### User
-
-```text
-UserBase
-UserCreate
-UserPublic
-UserPrivate
-UserUpdate
-Token
-```
-
-`UserCreate` includes the password. `UserPublic` (id, username, `image_file`,
-`image_path`) is what anyone can see; `UserPrivate` adds the email and is only returned to the user
-themselves. Neither includes the password or its hash. `image_path` is the
-URL of the profile picture (e.g. `/media/profile_pics/<file>.jpg`), or `null`
-if the user hasn't uploaded one. `Token` is the login response (`access_token`, `token_type`).
-
-Pydantic is responsible for validating API input before it reaches the
-database.
-
-Examples of validation include:
-
-- Required fields
-- String lengths
-- Non-negative experience values
-- Non-negative salary values
-- Valid date ranges
-- Valid salary ranges
-- Valid experience ranges
-- Valid application statuses
-- Valid email addresses (`EmailStr`)
-- Minimum password length (8 characters)
-
----
-
-## Pydantic and SQLAlchemy Integration
-
-Response schemas use:
-
-```python
-model_config = ConfigDict(from_attributes=True)
-```
-
-This allows Pydantic response models to be created from SQLAlchemy ORM
-objects.
-
-The general flow is:
-
-```text
-PostgreSQL
-    |
-    v
-SQLAlchemy ORM object
-    |
-    v
-Pydantic Response Schema
-    |
-    v
-JSON response
-```
-
----
-
-## API Error Handling
-
-The API handles common error conditions including:
-
-- Resource not found
-- Duplicate IDs
-- Duplicate job URLs
-- A user applying to the same job twice
-- Duplicate usernames
-- Duplicate emails
-- Invalid foreign-key references
-- Database constraint conflicts
-- Invalid request data
-- Missing, invalid, or expired access tokens
-- Accessing another user's application (`403 Forbidden`)
-- Incorrect email or password at login
-
-HTTP status codes are used to communicate errors.
-
-Examples:
-
-```text
-201 Created
-204 No Content
-401 Unauthorized
-403 Forbidden
-404 Not Found
-409 Conflict
-422 Unprocessable Content
-```
-
-Database `IntegrityError` exceptions are handled and converted into
-appropriate API conflict responses.
-
-For example, database constraint conflicts can result in:
-
-```text
-409 Conflict
-```
-
-instead of exposing raw database errors to the API client.
-
-Application-level FastAPI exception handlers are defined in:
-
-```text
-main.py
-```
-
-The HTTP exception handler keeps response headers, so `401` responses include
-`WWW-Authenticate: Bearer`.
-
-The handlers check the URL first. Requests to `/api/...` (and `/static`,
-`/media`) get the JSON error shown above. Pages opened in the browser, such as
-`/jobs/does-not-exist`, get the HTML error page (`templates/error.html`)
-instead of raw JSON.
-
-Shared resource lookup and database conflict helpers are defined in:
-
-```text
-routers/helpers.py
-```
-
----
-
-## Authentication
-
-Authentication utilities are defined in:
-
-```text
-auth.py
-```
-
-It provides:
-
-- `hash_password()` / `verify_password()` — Argon2 password hashing via
-  `pwdlib`
-- `create_access_token(data)` — creates a signed JWT from the given claims
-  (login passes `{"sub": "<user id>"}`) and adds an `exp` expiry (default 30
-  minutes)
-- `verify_access_token()` — verifies the signature and requires the `exp` and
-  `sub` claims, returning the user ID or `None`
-- `oauth2_scheme` — an `OAuth2PasswordBearer` scheme with token URL
-  `/api/users/token`
-- `get_current_user()` — a FastAPI dependency that resolves the bearer token
-  to a `User`, or raises `401 Unauthorized` with a
-  `WWW-Authenticate: Bearer` header
-- `CurrentUser` — shorthand for `Annotated[User, Depends(get_current_user)]`,
-  used by routers to require login
-- `generate_reset_token()` / `hash_reset_token()` — make a random password
-  reset token and its SHA-256 hash (only the hash is saved in the database)
-
-Tokens are signed with `SECRET_KEY` using the configured algorithm (`HS256` by
-default).
-
-### Login flow
-
-```text
-POST /api/users          register with username, email, password
-        |
-        v
-POST /api/users/token    send email (in the "username" form field) + password
-        |
-        v
-{"access_token": "...", "token_type": "bearer"}
-        |
-        v
-Authorization: Bearer <access_token>   sent with protected requests
-        |
-        v
-get_current_user()  ->  the logged-in User
-```
-
-The login endpoint uses FastAPI's `OAuth2PasswordRequestForm`. The OAuth2
-standard names the field `username`, but users log in with their **email**
-(matched case-insensitively).
-
-A wrong password and an unknown email return the same
-`401 Incorrect email or password` response. For unknown emails the password is
-still checked against a dummy hash, so response time does not reveal which
-emails are registered.
-
-### Protected routes
-
-Routes that depend on `get_current_user` require a valid token:
-
-- All `/api/applications` endpoints
-- `POST`, `PUT`, `PATCH`, and `DELETE` on `/api/companies` and `/api/jobs`
-- `GET`, `PATCH`, and `DELETE /api/users/me`
-- `PATCH` and `DELETE /api/users/me/picture`
-- `PATCH /api/users/me/password`
-
-Requests without a valid token receive `401 Unauthorized`. A logged-in user
-who tries to read or change another user's application receives
-`403 Forbidden`.
-
-### Using Swagger UI
-
-1. Register with `POST /api/users`.
-2. Click **Authorize** (top right of `/docs`).
-3. Enter your **email** in the `username` box and your password, then click
-   **Authorize**.
-4. Swagger now sends the token with every protected request. Tokens expire
-   after 30 minutes by default; authorize again when you get `401`.
-
-### Password reset flow
-
-```text
-POST /api/users/forgot-password   {"email": "..."}
-        |
-        |  if the email belongs to a user:
-        |    - delete their old reset tokens
-        |    - make a random token, save only its SHA-256 hash + expiry (60 min)
-        |    - add a background task that emails the token
-        v
-202 "If an account exists with this email, ..."   (sent right away)
-        |
-        v
-Background task sends the email (link: FRONTEND_URL/reset-password?token=...)
-        |
-        v
-POST /api/users/reset-password    {"token": "...", "new_password": "..."}
-        |
-        |  hash the token, find it, check it hasn't expired
-        |  set the new password, delete the user's reset tokens
-        v
-200 "Password reset successfully. ..."
-```
-
-- `forgot-password` gives the same answer whether or not the email is
-  registered, so it can't be used to find out who has an account.
-- The email is sent with FastAPI's `BackgroundTasks`. The response goes out
-  first, then the email is sent, so the user doesn't wait for the slow mail
-  server.
-- A token works only once, only the newest token works, and it stops working
-  after `RESET_TOKEN_EXPIRE_MINUTES`. An unknown, used, or expired token
-  returns `400 Invalid or expired reset token`.
-- `PATCH /api/users/me/password` changes the password for a logged-in user who
-  knows their current password (`400` if it is wrong). It also cancels any
-  reset tokens.
-
-The link in the email opens the frontend's `/reset-password` page, which reads
-the token from the URL and sends it to `POST /api/users/reset-password`. You
-can still test the endpoint directly by copying the `token` value from the
-link into Swagger.
-
----
-
-## Frontend
-
-The app includes a browser frontend built the same way as in Corey Schafer's
-tutorial: **Jinja2 templates** rendered by FastAPI, plus **plain JavaScript**
-that calls the existing `/api/...` endpoints with `fetch()`. There is no
-separate frontend framework or build step.
-
-### Pages
-
-| URL | Page | Login needed |
-| --- | --- | --- |
-| `/` | Dashboard: your application counts, status filters, search, and a table where you change status and interview rounds. Shows a welcome page when logged out. | For the dashboard |
-| `/jobs` | All jobs, newest first, with **Load more** | No |
-| `/jobs/{job_id}` | Job details, skills, education, description, and your application (**I applied** button) | To track an application |
-| `/companies` | All companies, A to Z, with **Load more** | No |
-| `/companies/{company_id}` | Company details and its jobs | No |
-| `/login`, `/register` | Log in / create an account | No |
-| `/account` | Profile, profile picture, password, log out, delete account | Yes |
-| `/forgot-password`, `/reset-password` | Password reset (the emailed link opens `/reset-password?token=...`) | No |
-
-Logged-in users also get an **Add** menu in the navbar to create jobs and
-companies, and **Edit** / **Delete** buttons on job and company pages.
-
-### Two ways a page gets its data
-
-```text
-Public data (jobs, companies)          Private data (dashboard, account)
-
-Browser -> GET /jobs                   Browser -> GET /
-            |                                       |
-            v                                       v
-routers/pages.py queries the DB        routers/pages.py returns the HTML only
-and fills in templates/jobs.html                    |
-            |                                       v
-            v                          JavaScript calls GET /api/applications
-HTML page with the jobs already in it  with "Authorization: Bearer <token>"
-                                                    |
-                                                    v
-                                       JavaScript draws the table
-```
-
-The login token is saved in the browser's `localStorage`, not in a cookie, so
-the browser does not send it when it asks for a page. That is why pages with
-private data load it with JavaScript after the page opens.
-
-**Load more** works like the tutorial's: the server renders the first page
-(`ITEMS_PER_PAGE` items) in the same order as the API, then the button calls
-`/api/jobs?skip=...&limit=...` for the next items.
-
-The dashboard needs *every* application to count them, so it follows
-`has_more` and fetches all pages (100 at a time) instead of only the first.
-
-### Login in the browser
-
-```text
-/login form  ->  POST /api/users/token (form data)  ->  access token
-        |
-        v
-token saved in localStorage
-        |
-        v
-every API call adds "Authorization: Bearer <token>"
-        |
-        v
-401 (token expired)  ->  token removed  ->  /login?next=<page you were on>
-```
-
-After logging in, you are sent back to the `next` page. Only paths on this site
-are accepted, so a link like `?next=https://other-site.com` can't send users
-somewhere else. Registering also logs you in automatically.
-
-### Files
-
-```text
-routers/pages.py        HTML page routes (hidden from /docs)
-templates/
-├── layout.html         navbar, footer, theme switch; every page extends it
-├── _macros.html        reusable pieces: job card, salary, dates, deadline badge
-├── _form_modals.html   New / Edit company and job forms
-├── home.html           dashboard / welcome page
-├── jobs.html, job.html
-├── companies.html, company.html
-├── login.html, register.html, account.html
-├── forgot_password.html, reset_password.html
-└── error.html          HTML error page (404 etc.)
-static/
-├── css/main.css        colors, dark mode, status badge colors
-├── icons/icon.svg      favicon
-└── js/
-    ├── api.js          token, current user, apiFetch(), fetchAllPages()
-    ├── utils.js        escaping, formatting, toasts, confirm dialog
-    └── forms.js        company and job forms
-```
-
-`static/js/api.js` is the only place that talks to the API. Its `apiFetch()`
-adds the token, sends plain objects as JSON (and `FormData` as-is for the login
-form and picture uploads), handles an expired token, and turns FastAPI's error
-body into one readable message. The pages call it instead of repeating that
-code.
-
-The JavaScript versions of the formatting helpers (`formatSalary()`,
-`deadlineBadge()`, ...) in `utils.js` match the Jinja macros in
-`_macros.html`, so cards added by **Load more** look the same as the ones the
-server rendered.
-
-### Changes compared to the tutorial's frontend
-
-- A dashboard with counts, status filters, and search, plus inline status and
-  interview-round controls
-- One shared `apiFetch()` helper instead of the same fetch code in every page
-- Returning to the page you came from after logging in (`?next=`)
-- Small pop-up toasts instead of success modals you have to close; a toast can
-  also be queued to show on the next page after a redirect
-- A letter avatar for users without a profile picture, and a **Remove** button
-  for the picture
-- Dark mode is applied before the page is drawn, so it doesn't flash white
-- Dates like `2026-10-29` are read as local dates, so they don't show one day
-  early in timezones behind UTC
-- Saved links (job URL, company website) only become clickable if they start
-  with `http://` or `https://`, so a `javascript:...` URL can't run code
-- All text from the API is escaped before it is added to the page, to prevent
-  XSS
-
----
-
-## Application Settings
-
-Application settings are defined in:
-
-```text
-config.py
-```
-
-A single `Settings` class (built on `pydantic-settings`) loads values from
-`.env` and is exposed as a shared `settings` object:
-
-| Setting | Environment variable | Default |
-| --- | --- | --- |
-| `database_url` | `DATABASE_URL` | required |
-| `secret_key` | `SECRET_KEY` | required, at least 32 characters |
-| `algorithm` | `ALGORITHM` | `HS256` |
-| `access_token_expire_minutes` | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` |
-| `max_upload_size_bytes` | `MAX_UPLOAD_SIZE_BYTES` | `5242880` (5 MB) |
-| `items_per_page` | `ITEMS_PER_PAGE` | `10` |
-| `reset_token_expire_minutes` | `RESET_TOKEN_EXPIRE_MINUTES` | `60` |
-| `mail_server` | `MAIL_SERVER` | `localhost` |
-| `mail_port` | `MAIL_PORT` | `587` |
-| `mail_username` | `MAIL_USERNAME` | empty |
-| `mail_password` | `MAIL_PASSWORD` | empty |
-| `mail_from` | `MAIL_FROM` | `noreply@example.com` |
-| `mail_use_tls` | `MAIL_USE_TLS` | `true` |
-| `frontend_url` | `FRONTEND_URL` | `http://localhost:8000` |
-
-`secret_key` and `mail_password` are stored as `SecretStr` so they are not
-shown in logs or reprs.
-
-`database.py`, `auth.py` and the routers import `settings` from `config.py`.
-The routers use `items_per_page` as the default `limit` for list endpoints.
-
----
-
-## Alembic
-
-Alembic is used for database schema migrations.
-
-The migrations are:
-
-```text
-Revision: 09f2cd3da047
-Message: initial schema
-
-Revision: 2bc8d0960952
-Revises:  09f2cd3da047
-Message: add users and application ownership
-
-Revision: 5c1e7a2f9d34
-Revises:  2bc8d0960952
-Message: add user password hash
-
-Revision: 8d4b2e6f1a73
-Revises:  5c1e7a2f9d34
-Message: add user image file
-
-Revision: a3f9c1d7e520
-Revises:  8d4b2e6f1a73
-Message: add password reset tokens
-
-Revision: 9a7a9755e6a4
-Revises:  a3f9c1d7e520
-Message: add interview rounds to applications
-```
-
-Alembic is the only thing that creates or changes tables. The app itself never
-does (see [FastAPI Lifespan](#fastapi-lifespan)).
-
-The `2bc8d0960952` migration:
-
-- Creates the `users` table
-- Adds a required `user_id` column to `application` with an
-  `ON DELETE CASCADE` foreign key
-- Replaces the unique `job_id` constraint with a unique (`user_id`, `job_id`)
-  constraint
-- Makes `application_id` database-generated using a sequence
-
-> **Warning:** because existing applications have no owner, this migration
-> **deletes all existing rows in `application`** before adding the `user_id`
-> column. Back up any application data you want to keep before upgrading.
-
-The `5c1e7a2f9d34` migration adds a required `password_hash` column to
-`users`. It requires the `users` table to be empty, because existing users
-have no password to fill it with.
-
-The `8d4b2e6f1a73` migration adds an optional `image_file` column to `users`
-for the profile picture's filename. Existing users simply get `NULL` (no
-picture), so it is safe to run on a database that already has users.
-
-The `a3f9c1d7e520` migration creates the `password_reset_tokens` table. It only
-adds a new table, so it is safe to run on a database that already has users.
-
-The `9a7a9755e6a4` migration adds a required `interview_rounds` column to
-`application`. It was made with `alembic revision --autogenerate`. Because the
-column is `NOT NULL`, it has `server_default="0"`: when the column is added,
-PostgreSQL fills in `0` for every application that already exists. Without a
-server default, adding a `NOT NULL` column to a table with rows would fail.
-
-The Alembic environment has been configured to work with the project's
-asynchronous SQLAlchemy engine while using Alembic's migration API.
-
-### Apply migrations
-
-```bash
-uv run alembic upgrade head
-```
-
-### Check the current migration
-
-```bash
-uv run alembic current
-```
-
-### Create a new migration
-
-After making approved SQLAlchemy model changes:
-
-```bash
-uv run alembic revision --autogenerate -m "description"
-```
-
-Autogenerate compares `models.py` with the real database and writes the
-difference as a migration file in `alembic/versions/`. Generated migrations
-should always be reviewed before applying them, then applied with
-`uv run alembic upgrade head`.
-
-To undo the most recent migration:
-
-```bash
-uv run alembic downgrade -1
-```
-
-### Check that models and database match
-
-```bash
-uv run alembic check
-```
-
-It prints `No new upgrade operations detected.` when `models.py` and the
-database are in sync.
-
-The `CheckConstraint`s in `models.py` are given explicit names (for example
-`job_check1`) that match the names PostgreSQL gave them. Alembic compares
-check constraints by name, so unnamed ones would make autogenerate think they
-had been removed and add wrong `drop_constraint` lines to every new
-migration.
-
----
-
-## Database Creation
-
-Create the empty PostgreSQL database once (for example in `psql` or pgAdmin):
-
-```sql
-CREATE DATABASE job_application_tracker;
-```
-
-Then `uv run alembic upgrade head` creates all the tables inside it.
-
-The database schema itself is represented through the SQLAlchemy models and
-managed through Alembic migrations.
+| ruff (dev) | Linting and code formatting |
+| pytest (dev) | Test runner (set up; tests are still to be written) |
 
 ---
 
 ## Configuration
 
-Create a `.env` file in the project root with these values:
+Copy `.env.example` to `.env` in the project root and fill in these values:
 
 ```env
 DATABASE_URL=postgresql://username:password@localhost:5432/job_application_tracker
@@ -1519,7 +149,7 @@ uv sync
 
 ### 2. Configure PostgreSQL
 
-Create the PostgreSQL database, create a `.env` file (see Configuration), and configure:
+Create the PostgreSQL database, copy `.env.example` to `.env` (see [Configuration](#configuration)), and configure:
 
 ```text
 DATABASE_URL
@@ -1549,170 +179,87 @@ http://127.0.0.1:8000        the frontend
 http://127.0.0.1:8000/docs   Swagger UI
 ```
 
----
+### Development tools
 
-## Project Structure
-
-The current project structure is approximately:
-
-```text
-job_application_tracker/
-│
-├── alembic/
-│   ├── versions/
-│   │   ├── 09f2cd3da047_initial_schema.py
-│   │   ├── 2bc8d0960952_add_users_and_application_ownership.py
-│   │   ├── 5c1e7a2f9d34_add_user_password_hash.py
-│   │   ├── 8d4b2e6f1a73_add_user_image_file.py
-│   │   ├── a3f9c1d7e520_add_password_reset_tokens.py
-│   │   └── 9a7a9755e6a4_add_interview_rounds_to_applications.py
-│   ├── env.py
-│   ├── README
-│   └── script.py.mako
-│
-├── routers/
-│   ├── __init__.py
-│   ├── helpers.py
-│   ├── companies.py
-│   ├── jobs.py
-│   ├── applications.py
-│   ├── users.py
-│   └── pages.py
-│
-├── static/
-│   ├── css/main.css
-│   ├── icons/icon.svg
-│   └── js/
-│       ├── api.js
-│       ├── forms.js
-│       └── utils.js
-│
-├── templates/
-│   ├── layout.html
-│   ├── _macros.html
-│   ├── _form_modals.html
-│   ├── home.html
-│   ├── jobs.html
-│   ├── job.html
-│   ├── companies.html
-│   ├── company.html
-│   ├── login.html
-│   ├── register.html
-│   ├── account.html
-│   ├── forgot_password.html
-│   ├── reset_password.html
-│   └── error.html
-│
-├── .env
-├── .gitignore
-├── .python-version
-├── alembic.ini
-├── auth.py
-├── config.py
-├── database.py
-├── email_utils.py
-├── image_utils.py
-├── main.py
-├── models.py
-├── pyproject.toml
-├── README.md
-├── schemas.py
-└── uv.lock
+```bash
+uv run ruff check        # find problems (unused imports, long lines, import order, ...)
+uv run ruff check --fix  # fix the ones ruff can fix safely
+uv run ruff format       # format the code
+uv run pytest            # run the tests in tests/ (still to be written)
 ```
 
-Local/generated files such as `.venv/`, `__pycache__/`, `.vscode/`, and
-uploaded pictures in `media/` may exist locally but are not intended to be committed as application source code.
+The ruff settings are in `pyproject.toml`: 120-character lines, two blank
+lines after imports (this project's style), and `alembic/versions` left alone.
 
 ---
 
-## Current CRUD Implementation
+## Current Limitations
 
-The current API implements CRUD for the three primary tracking entities:
+The following are not implemented yet:
 
-```text
-Company
-   ├── Create
-   ├── Read
-   ├── Update
-   └── Delete
+- Automated tests (pytest is set up; the tests are still to be written)
+- Notes and status history on the dashboard (they are on the job page)
+- Rate limit counts shared between server processes (they live in memory,
+  see [Rate Limiting](docs/auth.md#rate-limiting))
+- A real background job queue (emails use FastAPI's simple in-process
+  `BackgroundTasks`)
+- Caching
+- Notifications and reminders (e.g. for application deadlines)
+- Deployment configuration (including a request size limit and trusted proxy
+  headers in front of the app)
 
-Job
-   ├── Create
-   ├── Read
-   ├── Update
-   └── Delete
-
-Application
-   ├── Create
-   ├── Read
-   ├── Update
-   └── Delete
-```
-
-The list endpoints for all three are paginated.
-
-Users support registration, login, and reading, partially updating (PATCH),
-and deleting their own account through `/api/users/me`, uploading and
-removing a profile picture through `/api/users/me/picture`, changing their
-password through `/api/users/me/password`, resetting a forgotten password
-through `/api/users/forgot-password` and `/api/users/reset-password`, and
-viewing any user's public profile through `/api/users/{user_id}`.
-
-Both full replacement and partial update operations are supported.
-
-The implementation also respects the existing relational constraints rather
-than bypassing them through application shortcuts.
+These features can be added incrementally as the project grows.
 
 ---
 
-## Router Organization
+## Roadmap
 
-The current API is organized by resource.
+Planned development direction:
 
 ```text
-routers/
-│
-├── companies.py
-│   └── Company API
-│
-├── jobs.py
-│   └── Job API
-│
-├── applications.py
-│   └── Application API
-│
-├── users.py
-│   └── User API
-│
-├── pages.py
-│   └── HTML pages of the frontend
-│
-└── helpers.py
-    └── Shared database/validation helpers
+Async CRUD Foundation
+  ↓
+API Organization with Routers
+  ↓
+Users, Application Ownership & Auth Utilities
+  ↓
+Login Endpoint & Protected Routes
+  ↓
+Profile Picture Uploads
+  ↓
+Pagination
+  ↓
+Password Reset & Background Tasks
+  ↓
+Alembic-owned Schema & Autogenerate Workflow
+  ↓
+Jinja2 + JavaScript Frontend
+  ↓
+Security Hardening (token versions, rate limiting)
+  ↓
+Reference-table CRUD & Junction-table Operations
+  ↓
+Search and Filtering
+  ↓
+Application Notes & Status History
+  ↓
+Tracker Redesign (Add application form, Wishlist, board, needs attention)
+  ↓
+Private Per-user Data & Login-only Pages         ← current
+  ↓
+Automated Tests (pytest)
+  ↓
+Analytics
+  ↓
+Production Backend Improvements
+  ↓
+Deployment
 ```
 
-The router organization follows the FastAPI `APIRouter` pattern.
+Everything up to and including private per-user data and login-only pages
+is implemented.
 
-Resource routes are defined using router-level decorators such as:
-
-```python
-@router.get(...)
-@router.post(...)
-@router.put(...)
-@router.patch(...)
-@router.delete(...)
-```
-
-The routers are then registered with the main FastAPI application using:
-
-```python
-app.include_router(...)
-```
-
-Common API prefixes are applied when the routers are included.
-
-This keeps resource-specific API logic separated while preserving the same
-external API structure.
+The exact implementation order may evolve as the project develops.
 
 ---
 
@@ -1766,7 +313,20 @@ Tutorial topics applied to this project so far (each adapted to this schema):
 - Password reset with emails sent through FastAPI `BackgroundTasks`
 - PostgreSQL with Alembic as the only owner of the schema, and the
   `alembic revision --autogenerate` workflow (`interview_rounds` column)
-- A Jinja2 + JavaScript frontend (see [Frontend](#frontend))
+- A Jinja2 + JavaScript frontend (see [Frontend](docs/frontend.md#frontend))
+
+Added beyond the tutorial:
+
+- Fully private per-user data and login-only pages (login cookie for pages)
+- Logging out other devices after a password change (token versions)
+- Rate limiting with `slowapi`
+- Case-insensitive unique usernames and emails enforced by the database
+- Lookup lists and linking them to jobs and companies
+- Search and filters
+- Application notes and status history
+- A Wishlist status, a board view and a "Needs attention" panel
+- A one-step Add application form with optional job and company details
+- Linting and formatting with `ruff`
 
 The project now uses its own:
 
@@ -1796,130 +356,6 @@ https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH
 
 ---
 
-## Project Documentation
-
-### `config.py`
-
-Contains the `pydantic-settings` application settings (database URL, JWT
-secret key, algorithm, token lifetime, upload size limit, default page
-size, reset token lifetime, and mail server settings).
-
-### `auth.py`
-
-Contains password hashing, JWT access token helpers, password reset token
-helpers, and the `get_current_user` dependency.
-
-### `email_utils.py`
-
-Contains `send_email()`, which sends a plain-text email over SMTP with
-`aiosmtplib`, and `send_password_reset_email()`, which builds the reset email
-(run as a background task by `POST /api/users/forgot-password`).
-
-### `image_utils.py`
-
-Contains the profile picture helpers: cropping and resizing an upload to a
-300x300 JPEG with Pillow, saving it to `media/profile_pics/`, and deleting it.
-
-### `database.py`
-
-Contains the asynchronous PostgreSQL and SQLAlchemy database configuration.
-
-### `models.py`
-
-Contains SQLAlchemy ORM models.
-
-### `schemas.py`
-
-Contains Pydantic request and response schemas.
-
-### `main.py`
-
-Contains the FastAPI application, lifespan configuration, router registration,
-the `/media` static files mount for profile pictures, and application-level
-exception handlers.
-
-### `routers/`
-
-Contains the resource-specific API routers and shared router helpers.
-
-### `alembic/`
-
-Contains database migration configuration and migration revisions.
-
----
-
-## Current Limitations
-
-The current implementation focuses on the backend CRUD foundation and API
-architecture.
-
-The following features are not implemented yet:
-
-- Admin rights (any logged-in user can create, update, and delete companies
-  and jobs)
-- Automated tests
-- Dashboard
-- Search and filtering
-- Advanced application workflows
-- A real background job queue (emails use FastAPI's simple in-process
-  `BackgroundTasks`)
-- Caching
-- Notifications
-- Deployment configuration
-- Frontend UI
-
-These features can be added incrementally as the backend foundation expands.
-
----
-
-## Roadmap
-
-Planned development direction:
-
-```text
-Async CRUD Foundation
-  ↓
-API Organization with Routers
-  ↓
-Users, Application Ownership & Auth Utilities
-  ↓
-Login Endpoint & Protected Routes
-  ↓
-Profile Picture Uploads
-  ↓
-Pagination
-  ↓
-Password Reset & Background Tasks
-  ↓
-Alembic-owned Schema & Autogenerate Workflow   ← current
-  ↓
-Admin Rights for Companies and Jobs
-  ↓
-Reference-table CRUD
-  ↓
-Junction-table Operations
-  ↓
-Search and Filtering
-  ↓
-Application Workflows
-  ↓
-Dashboard / Analytics
-  ↓
-Production Backend Improvements
-  ↓
-Deployment
-```
-
-The router organization, users, application ownership, login, protected
-application routes, profile picture uploads, pagination of list endpoints,
-password reset with background email sending, and an Alembic-only schema
-workflow (no `create_all` on startup) are now implemented as part of the
-current backend architecture.
-
-The exact implementation order may evolve as the project develops.
-
----
-
 ## Project Goal
 
 The long-term goal is to turn this into a practical Job Application Tracker
@@ -1940,8 +376,9 @@ The project is intended to provide practical experience with:
 - Foreign keys and constraints
 - Database migrations
 - CRUD operations
-- Pagination
+- Pagination, search and filtering
 - Password hashing and JWT authentication
+- Rate limiting
 - Error handling
 - API documentation
 - Backend architecture
