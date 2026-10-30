@@ -54,6 +54,20 @@ PROFILE_PICS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
+@app.middleware("http")
+async def revalidate_static_files(request: Request, call_next):
+    """Make the browser check for a newer CSS/JS file on every page load.
+
+    Without this, browsers may keep using an old copy after a file changes. If the file hasn't
+    changed, the server answers with a tiny "304 Not Modified", so this stays fast.
+    """
+
+    response = await call_next(request)
+    if request.url.path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 def wants_json(request: Request) -> bool:
     """API calls get JSON errors; pages opened in the browser get the HTML error page."""
 
