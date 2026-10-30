@@ -1,10 +1,14 @@
 """Sending emails over SMTP (used for password reset emails)."""
 
+import logging
 from email.message import EmailMessage
 
 import aiosmtplib
 
 from config import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 async def send_email(to_email: str, subject: str, body: str) -> None:
@@ -44,4 +48,9 @@ Best regards,
 The Job Application Tracker Team
 """
 
-    await send_email(to_email=to_email, subject="Reset Your Password - Job Application Tracker", body=body)
+    try:
+        await send_email(to_email=to_email, subject="Reset Your Password - Job Application Tracker", body=body)
+    except (aiosmtplib.SMTPException, OSError):
+        # This runs after the response was sent, so the user can't be told. Log a clear message
+        # (with the error details) for whoever runs the server. Never log the token: it resets the password.
+        logger.exception("Could not send the password reset email for user %r", username)

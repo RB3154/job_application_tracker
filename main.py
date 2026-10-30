@@ -1,14 +1,19 @@
 from contextlib import asynccontextmanager
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from auth import LoginRequired
 from database import engine
 from image_utils import PROFILE_PICS_DIR
-from routers import applications, companies, jobs, pages, users
+from rate_limit import limiter, rate_limit_exceeded_handler
+from routers import applications, companies, jobs, lookups, pages, users
 from routers.pages import templates
 
 
@@ -25,10 +30,19 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# slowapi finds the limiter on app.state; the handler turns "too many requests" into a 429 JSON error.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
 app.include_router(companies.router, prefix="/api/companies", tags=["companies"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(applications.router, prefix="/api/applications", tags=["applications"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(lookups.locations_router, prefix="/api/locations", tags=["lookup lists"])
+app.include_router(lookups.work_modes_router, prefix="/api/work-modes", tags=["lookup lists"])
+app.include_router(lookups.skills_router, prefix="/api/skills", tags=["lookup lists"])
+app.include_router(lookups.education_router, prefix="/api/education", tags=["lookup lists"])
+app.include_router(lookups.sources_router, prefix="/api/sources", tags=["lookup lists"])
 app.include_router(pages.router)
 
 # CSS, JavaScript and icons used by the HTML pages.
@@ -46,16 +60,23 @@ def wants_json(request: Request) -> bool:
     return request.url.path.startswith(("/api", "/media", "/static"))
 
 
+@app.exception_handler(LoginRequired)
+async def login_required_handler(_request: Request, exception: LoginRequired):
+    """A page that needs login was opened while logged out: go to the login page, then come back."""
+
+    return RedirectResponse(f"/login?next={quote(exception.next_url, safe='')}", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @app.exception_handler(StarletteHTTPException)
 async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
     message = exception.detail if exception.detail else "Error occurred. Check the request and try again."
 
     if wants_json(request):
         return JSONResponse(
-                status_code=exception.status_code,
-                content={"detail": message},
-                headers=exception.headers,
-            )
+            status_code=exception.status_code,
+            content={"detail": message},
+            headers=exception.headers,
+        )
 
     return templates.TemplateResponse(
         request,
@@ -67,20 +88,20 @@ async def general_http_exception_handler(request: Request, exception: StarletteH
 
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request: Request, exception: RequestValidationError):
-        
-        if wants_json(request):
-            return JSONResponse(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                content={"detail": exception.errors()},
-            )
-
-        return templates.TemplateResponse(
-            request,
-            "error.html",
-            {
-                "title": "Invalid request",
-                "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
-                "message": "Invalid request. Check the address and try again.",
-            },
+    if wants_json(request):
+        # jsonable_encoder turns the ValueError objects inside some errors into text; plain JSON can't handle them.
+        return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": jsonable_encoder(exception.errors())},
         )
+
+    return templates.TemplateResponse(
+        request,
+        "error.html",
+        {
+            "title": "Invalid request",
+            "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "message": "Invalid request. Check the address and try again.",
+        },
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+    )

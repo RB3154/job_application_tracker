@@ -29,5 +29,8 @@ class Settings(BaseSettings):
     # Base URL of the site, used to build the reset link that opens the /reset-password page.
     frontend_url: str = "http://localhost:8000"
 
+    # Send the login cookie only over HTTPS. Keep False on http://localhost; set True when deployed with HTTPS.
+    cookie_secure: bool = False
+
 
 settings = Settings()
