@@ -214,13 +214,6 @@ function rowHTML(app) {
         <div class="small text-muted-soft">${app.current_status === "Wishlist" ? "saved" : "applied"}</div>
       </td>
       <td>${statusSelectHTML(app)}</td>
-      <td>
-        <div class="rounds-control">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="rounds" data-delta="-1" aria-label="One less interview round" ${app.interview_rounds === 0 ? "disabled" : ""}>−</button>
-          <span class="rounds-value">${app.interview_rounds}</span>
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="rounds" data-delta="1" aria-label="One more interview round">+</button>
-        </div>
-      </td>
       <td class="text-end pe-3">
         <button type="button" class="btn btn-sm btn-link text-danger" data-action="delete" aria-label="Delete application" title="Delete application">
           <i class="bi bi-trash"></i>
@@ -379,11 +372,6 @@ tbody.addEventListener("click", async (event) => {
     return;
   }
   const app = applicationFor(button);
-
-  if (button.dataset.action === "rounds") {
-    const rounds = Math.max(0, app.interview_rounds + Number(button.dataset.delta));
-    updateApplication(app, { interview_rounds: rounds });
-  }
 
   if (button.dataset.action === "delete") {
     const confirmed = await confirmDialog(`Stop tracking your application for "${roleOf(app)}"?`, { title: "Delete application?" });

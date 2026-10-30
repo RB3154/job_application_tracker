@@ -353,25 +353,6 @@ a.job-title:hover {
   font-size: 0.85rem;
 }
 
-.rounds-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.rounds-control .btn {
-  width: 1.85rem;
-  height: 1.85rem;
-  padding: 0;
-  line-height: 1;
-}
-
-.rounds-value {
-  min-width: 1.5rem;
-  text-align: center;
-  font-weight: 700;
-}
-
 .hero {
   padding: 3.5rem 2rem;
   text-align: center;

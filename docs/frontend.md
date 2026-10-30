@@ -17,8 +17,8 @@ separate frontend framework or build step.
 
 | URL | Page | Login needed |
 | --- | --- | --- |
-| `/` | **My applications** (the dashboard): your application counts, a **Needs attention** panel, status filters, search, and a **Table** or **Board** view where you change status (and interview rounds in the table). Shows a welcome page when logged out. | For the dashboard |
-| `/jobs` | Jobs, newest first, with search, location/skill/work mode filters, a "Still open" switch, and **Load more** | Yes |
+| `/` | **My applications** (the dashboard): your application counts, a **Needs attention** panel, status filters, search, and a **Table** or **Board** view where you change status. Shows a welcome page when logged out. | For the dashboard |
+| `/jobs` | Jobs, newest first, with search, location/skill/work mode filters, and **Load more** | Yes |
 | `/jobs/{job_id}` | Job details, skills, education, description, and your application (**Track this job** button, notes, status history) | Yes |
 | `/companies` | Companies, A to Z, with search and **Load more** | Yes |
 | `/companies/{company_id}` | Company details, locations, and its jobs | Yes |
