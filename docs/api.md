@@ -71,7 +71,7 @@ Operations for users:
 - Delete the logged-in user with DELETE `/me` (their applications and profile
   picture are deleted with them)
 - Upload a profile picture with PATCH `/me/picture` (cropped to a 300x300 JPEG,
-  max 5 MB)
+  max 5 MB, stored in AWS S3)
 - Remove the profile picture with DELETE `/me/picture`
 - Change the password with PATCH `/me/password` (needs the current password).
   Other devices are logged out; the response contains a new token for this one.
@@ -537,8 +537,8 @@ Errors from Pydantic model validators (e.g. "exp_max must be greater than or
 equal to exp_min") contain Python exception objects that plain JSON can't hold;
 without it, those requests would crash with `500`.
 
-The handlers check the URL first. Requests to `/api/...` (and `/static`,
-`/media`) get the JSON error shown above. Pages opened in the browser, such as
+The handlers check the URL first. Requests to `/api/...` (and `/static`) get
+the JSON error shown above. Pages opened in the browser, such as
 `/jobs/does-not-exist`, get the HTML error page (`templates/error.html`)
 instead of raw JSON.
 

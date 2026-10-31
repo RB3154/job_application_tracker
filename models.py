@@ -21,6 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from config import settings
 from database import Base
 
 
@@ -175,7 +176,9 @@ class User(Base):
     def image_path(self) -> str | None:
         """URL of the profile picture, or None if the user hasn't uploaded one."""
 
-        return f"/media/profile_pics/{self.image_file}" if self.image_file else None
+        if not self.image_file:
+            return None
+        return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/profile_pics/{self.image_file}"
 
 
 class PasswordResetToken(Base):

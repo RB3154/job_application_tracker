@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     secret_key: SecretStr = Field(min_length=32)
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+
+    # AWS S3 storage for user uploaded profile pictures.
+    s3_bucket_name: str
+    s3_region: str = "ap-southeast-2"
+    s3_access_key_id: SecretStr | None = None
+    s3_secret_access_key: SecretStr | None = None
+    # Set only for S3-compatible services such as MinIO or R2.
+    s3_endpoint_url: str | None = None
+
     max_upload_size_bytes: int = 5 * 1024 * 1024
     items_per_page: int = 10
 

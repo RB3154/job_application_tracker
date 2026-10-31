@@ -209,7 +209,7 @@ one when the password is changed or reset, which makes older tokens invalid
 `password_hash` is required. Plain-text passwords are never stored.
 
 `image_file` is optional. It holds only the picture's filename; the picture
-itself is saved on disk in `media/profile_pics/`.
+itself is stored in AWS S3, in the bucket's `profile_pics/` folder.
 
 ### Password reset token constraints
 
@@ -312,7 +312,7 @@ PasswordChangedResponse
 `UserCreate` includes the password. `UserPublic` (id, username, `image_file`,
 `image_path`) is what anyone can see; `UserPrivate` adds the email and is only returned to the user
 themselves. Neither includes the password or its hash. `image_path` is the
-URL of the profile picture (e.g. `/media/profile_pics/<file>.jpg`), or `null`
+S3 URL of the profile picture (e.g. `https://<bucket>.s3.<region>.amazonaws.com/profile_pics/<file>.jpg`), or `null`
 if the user hasn't uploaded one. `Token` is the login response (`access_token`, `token_type`).
 `PasswordChangedResponse` is the change-password response: a message plus a
 fresh token, because the old one stops working.

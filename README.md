@@ -81,6 +81,7 @@ Interactive API docs are also available while the app runs, at `/docs`
 | PyJWT | JWT access token creation and verification |
 | pwdlib (Argon2) | Password hashing |
 | Pillow | Profile picture cropping and resizing |
+| boto3 | Storing profile pictures in AWS S3 |
 | aiosmtplib | Sending password reset emails asynchronously over SMTP |
 | slowapi | Rate limiting login and password reset requests |
 | uv | Python package and environment management |
@@ -109,6 +110,24 @@ python -c "import secrets; print(secrets.token_hex(32))"
 The application will not start without a `SECRET_KEY` of at least 32
 characters.
 
+Profile pictures are stored in an AWS S3 bucket, so fill in the `S3_*` settings
+too. The application will not start without `S3_BUCKET_NAME`:
+
+```env
+S3_BUCKET_NAME=<your bucket name>
+S3_REGION=<your bucket's region, e.g. ap-southeast-2>
+S3_ACCESS_KEY_ID=<from your IAM user>
+S3_SECRET_ACCESS_KEY=<from your IAM user>
+```
+
+The bucket and IAM user need these permissions on the bucket's `profile_pics/*`
+files:
+
+- **Bucket policy**: anyone can view them (`s3:GetObject`), so that browsers can
+  load the pictures.
+- **IAM user's policy**: the app can upload and delete them (`s3:PutObject`,
+  `s3:DeleteObject`).
+
 For password reset emails, fill in the `MAIL_*` settings. While developing, a
 free [Mailtrap](https://mailtrap.io) sandbox inbox is the easiest option: it
 catches every email so nothing reaches a real inbox. Copy the SMTP host, port,
@@ -133,7 +152,7 @@ driver format internally:
 postgresql+asyncpg
 ```
 
-Do not commit `.env` or database credentials to GitHub.
+Do not commit `.env`, database credentials or AWS keys to GitHub.
 
 ---
 

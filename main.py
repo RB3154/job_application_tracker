@@ -11,7 +11,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from auth import LoginRequired
 from database import engine
-from image_utils import PROFILE_PICS_DIR
 from rate_limit import limiter, rate_limit_exceeded_handler
 from routers import applications, companies, jobs, lookups, pages, users
 from routers.pages import templates
@@ -48,11 +47,6 @@ app.include_router(pages.router)
 # CSS, JavaScript and icons used by the HTML pages.
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Serve uploaded files, so /media/profile_pics/<file>.jpg opens the picture.
-# StaticFiles needs the folder to exist when the app starts.
-PROFILE_PICS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/media", StaticFiles(directory="media"), name="media")
-
 
 @app.middleware("http")
 async def revalidate_static_files(request: Request, call_next):
@@ -71,7 +65,7 @@ async def revalidate_static_files(request: Request, call_next):
 def wants_json(request: Request) -> bool:
     """API calls get JSON errors; pages opened in the browser get the HTML error page."""
 
-    return request.url.path.startswith(("/api", "/media", "/static"))
+    return request.url.path.startswith(("/api", "/static"))
 
 
 @app.exception_handler(LoginRequired)

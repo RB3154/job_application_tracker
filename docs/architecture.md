@@ -300,7 +300,7 @@ It currently contains:
 - Router imports
 - Router registration
 - The rate limiter (`app.state.limiter` and its `429` handler)
-- The `/static` (CSS/JS) and `/media` (uploaded pictures) file mounts
+- The `/static` (CSS/JS) file mount
 - Exception handlers
 
 The resource-specific API route implementations are kept inside the
@@ -402,6 +402,11 @@ A single `Settings` class (built on `pydantic-settings`) loads values from
 | `secret_key` | `SECRET_KEY` | required, at least 32 characters |
 | `algorithm` | `ALGORITHM` | `HS256` |
 | `access_token_expire_minutes` | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` |
+| `s3_bucket_name` | `S3_BUCKET_NAME` | required |
+| `s3_region` | `S3_REGION` | `ap-southeast-2` |
+| `s3_access_key_id` | `S3_ACCESS_KEY_ID` | none |
+| `s3_secret_access_key` | `S3_SECRET_ACCESS_KEY` | none |
+| `s3_endpoint_url` | `S3_ENDPOINT_URL` | none (only for S3-compatible services) |
 | `max_upload_size_bytes` | `MAX_UPLOAD_SIZE_BYTES` | `5242880` (5 MB) |
 | `items_per_page` | `ITEMS_PER_PAGE` | `10` |
 | `reset_token_expire_minutes` | `RESET_TOKEN_EXPIRE_MINUTES` | `60` |
@@ -414,8 +419,8 @@ A single `Settings` class (built on `pydantic-settings`) loads values from
 | `frontend_url` | `FRONTEND_URL` | `http://localhost:8000` |
 | `cookie_secure` | `COOKIE_SECURE` | `false` (set `true` with HTTPS) |
 
-`secret_key` and `mail_password` are stored as `SecretStr` so they are not
-shown in logs or reprs.
+`secret_key`, `mail_password` and the two S3 keys are stored as `SecretStr` so
+they are not shown in logs or reprs.
 
 `database.py`, `auth.py` and the routers import `settings` from `config.py`.
 The routers use `items_per_page` as the default `limit` for list endpoints.
@@ -515,7 +520,7 @@ job_application_tracker/
 ```
 
 Local/generated files such as `.venv/`, `__pycache__/`, `.vscode/`, and
-uploaded pictures in `media/` may exist locally but are not intended to be committed as application source code.
+older uploaded pictures in `media/` may exist locally but are not intended to be committed as application source code.
 
 ---
 
@@ -547,7 +552,9 @@ requests" into a `429` JSON error (see [Rate Limiting](auth.md#rate-limiting)).
 ### `image_utils.py`
 
 Contains the profile picture helpers: cropping and resizing an upload to a
-300x300 JPEG with Pillow, saving it to `media/profile_pics/`, and deleting it.
+300x300 JPEG with Pillow, then uploading it to and deleting it from the
+`profile_pics/` folder of the S3 bucket with boto3. boto3 is not async, so its
+network calls run in a thread instead of blocking the event loop.
 
 ### `database.py`
 
@@ -564,8 +571,7 @@ Contains Pydantic request and response schemas.
 ### `main.py`
 
 Contains the FastAPI application, lifespan configuration, router registration,
-the rate limiter setup, the `/media` static files mount for profile pictures,
-and application-level exception handlers.
+the rate limiter setup, and application-level exception handlers.
 
 ### `routers/`
 

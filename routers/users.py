@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from PIL import Image
@@ -22,7 +23,7 @@ from auth import (
 from config import settings
 from database import get_db
 from email_utils import send_password_reset_email
-from image_utils import delete_profile_image, process_profile_image
+from image_utils import delete_profile_image, process_profile_image, upload_profile_image
 from rate_limit import limiter
 from routers.helpers import commit_or_raise_conflict, ensure_email_available, ensure_username_available
 from schemas import (
@@ -235,7 +236,7 @@ async def delete_me(current_user: CurrentUser, db: Annotated[AsyncSession, Depen
     old_filename = current_user.image_file
     await db.delete(current_user)
     await commit_or_raise_conflict(db)
-    delete_profile_image(old_filename)
+    await delete_profile_image(old_filename)
 
 
 @router.patch("/me/picture", response_model=UserPrivate)
@@ -254,7 +255,7 @@ async def upload_my_picture(
 
     # Resizing an image is slow CPU work, so run it in a thread instead of blocking the event loop.
     try:
-        new_filename = await run_in_threadpool(process_profile_image, content)
+        processed_bytes, new_filename = await run_in_threadpool(process_profile_image, content)
     except Image.DecompressionBombError as exception:
         # A small file that unpacks into a gigantic picture, which would use up the server's memory.
         raise HTTPException(
@@ -268,12 +269,21 @@ async def upload_my_picture(
             detail="Invalid image file. Please upload a valid image (JPEG, PNG, GIF, WebP).",
         ) from exception
 
+    # ClientError: S3 refused the request (e.g. wrong keys). BotoCoreError: S3 couldn't be reached.
+    try:
+        await upload_profile_image(processed_bytes, new_filename)
+    except (BotoCoreError, ClientError) as exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload image. Please try again.",
+        ) from exception
+
     old_filename = current_user.image_file
     current_user.image_file = new_filename
     await commit_or_raise_conflict(db)
     await db.refresh(current_user)
     # Remove the old file only after the database points at the new one.
-    delete_profile_image(old_filename)
+    await delete_profile_image(old_filename)
     return current_user
 
 
@@ -286,5 +296,5 @@ async def delete_my_picture(current_user: CurrentUser, db: Annotated[AsyncSessio
     current_user.image_file = None
     await commit_or_raise_conflict(db)
     await db.refresh(current_user)
-    delete_profile_image(old_filename)
+    await delete_profile_image(old_filename)
     return current_user
