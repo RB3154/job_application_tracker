@@ -1,23 +1,8 @@
-// A picker for one lookup list (locations, work modes, skills, education or sources), used in the
-// "Skills & locations" form on the job page and the "Locations" form on the company page.
-//
-// It shows the chosen entries as rows with a remove button, and a text box to add more. Typing a name
-// that isn't in the list yet creates it (POST to the list's endpoint), so users never need to pick ids.
-
 import { apiFetch } from "/static/js/api.js";
 import { escapeHtml, showToast } from "/static/js/utils.js";
 
 let pickerCount = 0;
 
-/**
- * Turn an empty element into a picker.
- *
- * options.endpoint - e.g. "/api/skills"
- * options.noun     - e.g. "skill", used in placeholders and messages
- * options.extra    - null, "skillType" (a Required / Nice to have dropdown per row) or "note" (a text box per row)
- *
- * Returns { load(), setSelected(items), getSelected() }.
- */
 export function createPicker(element, { endpoint, noun, extra = null }) {
   const listId = `picker-options-${++pickerCount}`;
   element.innerHTML = `
@@ -33,8 +18,8 @@ export function createPicker(element, { endpoint, noun, extra = null }) {
   const addButton = element.querySelector("button");
   const datalist = element.querySelector("datalist");
 
-  let options = []; // every entry in the list: [{ id, name }]
-  let selected = []; // the chosen entries: [{ id, name, skill_type?, note? }]
+  let options = [];
+  let selected = [];
 
   function renderOptions() {
     datalist.innerHTML = options.map((option) => `<option value="${escapeHtml(option.name)}"></option>`).join("");
@@ -72,7 +57,6 @@ export function createPicker(element, { endpoint, noun, extra = null }) {
       .join("");
   }
 
-  // Keep what the user typed in the extra controls when rows are re-drawn.
   function readExtras() {
     itemsList.querySelectorAll(".picker-item").forEach((row) => {
       const control = row.querySelector(".picker-extra");
@@ -95,7 +79,6 @@ export function createPicker(element, { endpoint, noun, extra = null }) {
     }
     let option = options.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
     if (!option) {
-      // Not in the list yet: add it to the shared list first.
       try {
         option = await apiFetch(endpoint, { method: "POST", body: { name } });
       } catch (error) {
@@ -117,7 +100,6 @@ export function createPicker(element, { endpoint, noun, extra = null }) {
 
   addButton.addEventListener("click", addTyped);
   input.addEventListener("keydown", (event) => {
-    // Enter adds the entry instead of submitting the whole form.
     if (event.key === "Enter") {
       event.preventDefault();
       addTyped();

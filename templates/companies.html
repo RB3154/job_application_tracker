@@ -11,7 +11,6 @@
             <i class="bi bi-plus-lg"></i> New company
         </button>
     </div>
-    <!-- Search: a normal GET form, so the search ends up in the URL (/companies?q=...). -->
     <form class="d-flex gap-2 mb-4" method="get" action="{{ url_for('companies_page') }}" role="search">
         <input type="search" class="form-control" name="q" value="{{ q }}" placeholder="Search companies"
                aria-label="Search companies" maxlength="100">
@@ -84,7 +83,6 @@
         async function loadMoreCompanies() {
           setButtonLoading(loadMoreBtn, true, "Loading...");
           try {
-            // Send the filters this page was opened with (they're in its URL), plus the next page's position.
             const params = new URLSearchParams(window.location.search);
             params.set("skip", currentOffset);
             params.set("limit", limit);

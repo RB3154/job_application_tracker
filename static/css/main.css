@@ -1,8 +1,6 @@
 :root {
-  /* Fonts */
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* Colors */
   --color-brand: #4f5bd5;
   --color-brand-hover: #424cb8;
   --color-brand-soft: #eef0fd;
@@ -13,13 +11,11 @@
   --color-text-muted: #6b7088;
   --color-border: #e3e5ee;
 
-  /* Sizing */
   --navbar-height: 4rem;
   --radius: 0.75rem;
   --shadow: 0 1px 2px rgba(22, 26, 46, 0.04), 0 2px 8px rgba(22, 26, 46, 0.04);
   --shadow-hover: 0 4px 16px rgba(22, 26, 46, 0.08);
 
-  /* Make Bootstrap's own "primary" (links, focus rings, checkboxes) use our brand color. */
   --bs-primary: var(--color-brand);
   --bs-primary-rgb: 79, 91, 213;
   --bs-link-color: var(--color-brand);
@@ -47,7 +43,6 @@
   --bs-body-bg: var(--color-bg-body);
 }
 
-/* Base Styles */
 body {
   font-family: var(--font-body);
   background: var(--color-bg-body);
@@ -84,7 +79,6 @@ button:focus-visible {
   color: var(--color-text-muted);
 }
 
-/* Navigation */
 .site-navbar {
   min-height: var(--navbar-height);
   background: var(--color-bg-content);
@@ -127,7 +121,6 @@ button:focus-visible {
   background: var(--color-brand-soft);
 }
 
-/* Content cards */
 .content-section {
   background: var(--color-bg-content);
   border: 1px solid var(--color-border);
@@ -167,7 +160,6 @@ button:focus-visible {
   margin-bottom: 0.75rem;
 }
 
-/* Job cards */
 .job-title {
   color: var(--color-text-heading);
   font-weight: 700;
@@ -222,7 +214,6 @@ a.job-title:hover {
   overflow: hidden;
 }
 
-/* Detail list (label / value pairs on the job page) */
 .detail-list {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -239,7 +230,6 @@ a.job-title:hover {
   margin: 0;
 }
 
-/* Status badges: one color per application status. */
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -277,7 +267,6 @@ a.job-title:hover {
 [data-bs-theme="dark"] .status-rejected { color: #ff9b91; background: #43201d; }
 [data-bs-theme="dark"] .status-withdrawn { color: #b5b9ca; background: #2a2d3b; }
 
-/* Dashboard */
 .stat-card {
   padding: 1rem 1.25rem;
   height: 100%;
@@ -380,7 +369,6 @@ a.job-title:hover {
   margin-bottom: 0.75rem;
 }
 
-/* Avatars: uploaded picture, or a colored circle with the first letter. */
 .avatar {
   border-radius: 50%;
   object-fit: cover;
@@ -396,14 +384,12 @@ a.job-title:hover {
   font-weight: 700;
 }
 
-/* Auth pages */
 .auth-card {
   max-width: 28rem;
   margin: 1rem auto;
   padding: 2rem;
 }
 
-/* Buttons and forms in the brand color */
 .btn-primary {
   --bs-btn-color: #fff;
   --bs-btn-bg: var(--color-brand);
@@ -450,7 +436,6 @@ a.job-title:hover {
   z-index: 1090;
 }
 
-/* Optional, folded sections in the Add application form */
 .form-section {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -462,7 +447,6 @@ a.job-title:hover {
   cursor: pointer;
 }
 
-/* Lookup pickers (static/js/pickers.js): one row per chosen location, skill, etc. */
 .picker-item {
   display: flex;
   align-items: center;
@@ -483,7 +467,6 @@ a.job-title:hover {
   max-width: 50%;
 }
 
-/* Dashboard board view (static/js/dashboard.js): one column per status, scrolls sideways on small screens. */
 .board {
   display: flex;
   gap: 1rem;
@@ -530,10 +513,8 @@ a.job-title:hover {
   gap: 0.75rem;
 }
 
-/* "Needs attention" panel above the dashboard */
 .attention-item {
   display: flex;
   gap: 0.5rem;
   padding: 0.3rem 0;
 }
-

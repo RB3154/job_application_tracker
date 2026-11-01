@@ -38,7 +38,6 @@ from schemas import (
 
 router = APIRouter()
 
-# The tables that attach locations, work modes, skills, education and sources to a job.
 JOB_LINK_MODELS = (models.JobLocation, models.JobWorkMode, models.JobSkill, models.JobEducation, models.JobSource)
 
 
@@ -47,14 +46,11 @@ def sorted_by_name(items):
 
 
 def job_details_response(job: models.Job) -> JobDetailsResponse:
-    """Turn a job loaded by get_job_with_details_or_404 into the details JSON, each list sorted A-Z."""
-
     return JobDetailsResponse(
         locations=sorted_by_name(LookupResponse(id=item.loc_id, name=item.name) for item in job.locations),
         work_modes=sorted_by_name(LookupResponse(id=item.work_mode_id, name=item.name) for item in job.work_modes),
         sources=sorted_by_name(LookupResponse(id=item.source_id, name=item.source_name) for item in job.sources),
         skills=sorted_by_name(
-            # skill_type can be NULL in the database; the column's default meaning is "required".
             JobSkillResponse(id=link.skill_id, name=link.skill.skill_name, skill_type=link.skill_type or "required")
             for link in job.job_skills
         ),
@@ -68,8 +64,6 @@ def job_details_response(job: models.Job) -> JobDetailsResponse:
 
 
 async def save_job_changes(job: models.Job, values: dict, user_id: int, db: AsyncSession) -> models.Job:
-    """Shared by PUT and PATCH: check a changed company_id (must be the user's) or job_url, then save."""
-
     if "company_id" in values and values["company_id"] != job.company_id:
         await get_company_or_404(values["company_id"], user_id, db)
     if "job_url" in values and values["job_url"] != job.job_url:
@@ -88,7 +82,6 @@ async def get_jobs(
     params: Annotated[JobListQuery, Query()],
 ):
     query = filter_jobs(select(models.Job), params, current_user.id)
-    # Newest postings first; job_id breaks ties so rows with the same date keep a fixed order between pages.
     query = query.order_by(models.Job.job_posting_date.desc(), models.Job.job_id)
     page = await paginate(query, db, params.skip, params.limit)
 
@@ -123,7 +116,6 @@ async def replace_job(
     job_id: str, job_data: JobBase, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     job = await get_job_or_404(job_id, current_user.id, db)
-    # PUT replaces everything, so every field is saved.
     return await save_job_changes(job, job_data.model_dump(), current_user.id, db)
 
 
@@ -135,21 +127,16 @@ async def update_job(
     try:
         job_data.validate_ranges_against(job)
     except ValidationError as exception:
-        # Same 422 error FastAPI gives for a bad request body, e.g. "exp_max must be greater than or equal to exp_min".
         raise RequestValidationError(exception.errors()) from exception
-    # PATCH changes only the fields that were sent.
     return await save_job_changes(job, job_data.model_dump(exclude_unset=True), current_user.id, db)
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job(job_id: str, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     job = await get_job_or_404(job_id, current_user.id, db)
-    # A job you track an application for can't be deleted; delete the application first.
-    # Only need to know if at least one exists, so fetch a single row.
     result = await db.execute(select(models.Application.job_id).where(models.Application.job_id == job_id).limit(1))
     if result.scalars().first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job has applications and cannot be deleted")
-    # Its locations, skills, etc. are part of the job itself, so they go with it.
     for link_model in JOB_LINK_MODELS:
         await db.execute(delete(link_model).where(link_model.job_id == job_id))
     await db.delete(job)
@@ -165,10 +152,7 @@ async def get_job_details(job_id: str, current_user: CurrentUser, db: Annotated[
 async def replace_job_details(
     job_id: str, details: JobDetails, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Replace everything attached to the job with the lists sent (an empty list removes them all)."""
-
     await get_job_or_404(job_id, current_user.id, db)
-    # Only the user's own list entries can be attached.
     user_id = current_user.id
     await ensure_ids_exist(models.Location.loc_id, details.location_ids, "Location", user_id, db)
     await ensure_ids_exist(models.WorkMode.work_mode_id, details.work_mode_ids, "Work mode", user_id, db)
@@ -182,7 +166,6 @@ async def replace_job_details(
         db,
     )
 
-    # Simplest way to "replace": remove the old links, then add the new ones, all in one transaction.
     for link_model in JOB_LINK_MODELS:
         await db.execute(delete(link_model).where(link_model.job_id == job_id))
     db.add_all(

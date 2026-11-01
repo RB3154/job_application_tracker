@@ -35,7 +35,6 @@ from schemas import (
 
 router = APIRouter()
 
-# The optional details the Add application form can send for the job and the company.
 JOB_DETAIL_FIELDS = {
     "JD",
     "application_deadline",
@@ -52,8 +51,6 @@ COMPANY_DETAIL_FIELDS = {"company_site", "company_description"}
 
 
 def fill_empty_fields(row, values: dict) -> None:
-    """Set only the fields that are still empty (None), so details saved earlier are never overwritten."""
-
     for field, value in values.items():
         if getattr(row, field) is None:
             setattr(row, field, value)
@@ -62,21 +59,16 @@ def fill_empty_fields(row, values: dict) -> None:
 async def save_application_changes(
     application: models.Application, values: dict, user_id: int, db: AsyncSession
 ) -> models.Application:
-    """Shared by PUT and PATCH: check a changed job_id, then save the new values."""
-
     if "job_id" in values and values["job_id"] != application.job_id:
         await get_job_or_404(values["job_id"], user_id, db)
         await ensure_application_job_available(user_id, values["job_id"], db, application.application_id)
     old_status = application.current_status
     for field, value in values.items():
         setattr(application, field, value)
-    # For a Wishlist item the date is when it was saved. Moving it on (e.g. to Applied) means the user
-    # applied now, so use today, unless they sent a date themselves.
     leaving_wishlist = old_status == "Wishlist" and values.get("current_status", "Wishlist") != "Wishlist"
     if leaving_wishlist and "date_applied" not in values:
         application.date_applied = date.today()
     if "current_status" in values and values["current_status"] != old_status:
-        # Saved in the same commit as the change itself, so history and status can't disagree.
         db.add(
             models.ApplicationStatusChange(
                 application_id=application.application_id, from_status=old_status, to_status=values["current_status"]
@@ -93,7 +85,6 @@ async def get_applications(
     db: Annotated[AsyncSession, Depends(get_db)],
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = settings.items_per_page,
-    # Called status_filter here so it doesn't hide FastAPI's `status` module; the URL still says ?status=.
     status_filter: Annotated[
         ApplicationStatus | None, Query(alias="status", description="Only applications with this status")
     ] = None,
@@ -101,11 +92,9 @@ async def get_applications(
     query = select(models.Application).where(models.Application.user_id == current_user.id)
     if status_filter is not None:
         query = query.where(models.Application.current_status == status_filter)
-    # Most recent first; application_id breaks ties so applications on the same day keep a fixed order between pages.
     query = query.order_by(models.Application.date_applied.desc(), models.Application.application_id.desc())
     page = await paginate(query, db, skip, limit)
 
-    # One extra query for the whole page: the latest history entry of each application on it.
     ids = [application.application_id for application in page.items]
     history = models.ApplicationStatusChange
     result = await db.execute(
@@ -136,11 +125,8 @@ async def create_application(
 ):
     await get_job_or_404(application_data.job_id, current_user.id, db)
     await ensure_application_job_available(current_user.id, application_data.job_id, db)
-    # exclude_none treats a null value like a missing one, so the database fills in its
-    # defaults (today's date, status 'Applied') instead of failing on the NOT NULL column.
     values = application_data.model_dump(exclude_unset=True, exclude_none=True)
     application = models.Application(**values, user_id=current_user.id)
-    # The first history entry. "Applied" is the column's default when no status is sent.
     application.status_changes.append(
         models.ApplicationStatusChange(from_status=None, to_status=values.get("current_status", "Applied"))
     )
@@ -154,20 +140,9 @@ async def create_application(
 async def quick_create_application(
     data: QuickApplicationCreate, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Track an application in one step: find or create the company and the job, then the application.
-
-    - Company: one of the user's companies with the same name (any upper/lower case), otherwise a new one.
-    - Job: one of the user's jobs with the same link, otherwise a new one (at that company).
-      A reused job keeps its own company and role.
-    - The optional job and company details are saved on new ones; on existing ones they only fill in
-      fields that are still empty, so nothing saved earlier is overwritten.
-    Everything is saved in one transaction, so a failure leaves no half-created company or job behind.
-    """
-
     job_details = data.model_dump(include=JOB_DETAIL_FIELDS, exclude_none=True)
     company_details = data.model_dump(include=COMPANY_DETAIL_FIELDS, exclude_none=True)
 
-    # Only the user's own jobs and companies are reused; other users' are never seen.
     result = await db.execute(
         select(models.Job).where(models.Job.job_url == data.job_url, models.Job.user_id == current_user.id)
     )
@@ -206,18 +181,16 @@ async def quick_create_application(
     else:
         await ensure_application_job_available(current_user.id, job.job_id, db)
         fill_empty_fields(job, job_details)
-        fill_empty_fields(await db.get(models.Company, job.company_id), company_details)
-        # The filled-in details must still make sense together with what the job already had.
         try:
             JobBase.model_validate({field: getattr(job, field) for field in JobBase.model_fields})
         except ValidationError as exception:
             raise RequestValidationError(exception.errors()) from exception
+        fill_empty_fields(await db.get(models.Company, job.company_id), company_details)
 
     values = data.model_dump(include={"current_status", "date_applied", "interview_rounds", "notes"}, exclude_none=True)
     application = models.Application(**values, job_id=job.job_id, user_id=current_user.id)
     application.status_changes.append(models.ApplicationStatusChange(from_status=None, to_status=data.current_status))
     db.add(application)
-    # SQLAlchemy inserts the company, then the job, then the application, because of their foreign keys.
     await commit_or_raise_conflict(db)
     await db.refresh(application)
     return application
@@ -232,8 +205,6 @@ async def get_application(application_id: int, current_user: CurrentUser, db: An
 async def get_application_history(
     application_id: int, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Every status the application has had, oldest first."""
-
     await get_application_or_404(application_id, current_user.id, db)
     result = await db.execute(
         select(models.ApplicationStatusChange)
@@ -251,7 +222,6 @@ async def replace_application(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     application = await get_application_or_404(application_id, current_user.id, db)
-    # PUT replaces everything, so every field is saved.
     return await save_application_changes(application, application_data.model_dump(), current_user.id, db)
 
 
@@ -263,7 +233,6 @@ async def update_application(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     application = await get_application_or_404(application_id, current_user.id, db)
-    # PATCH changes only the fields that were sent.
     values = application_data.model_dump(exclude_unset=True)
     return await save_application_changes(application, values, current_user.id, db)
 

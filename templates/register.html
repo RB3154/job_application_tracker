@@ -67,7 +67,6 @@
           try {
             await apiFetch("/api/users", { method: "POST", body: userData });
 
-            // Log the new user straight in, instead of making them type the same details again.
             const loginData = new FormData();
             loginData.append("username", userData.email);
             loginData.append("password", userData.password);

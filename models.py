@@ -1,5 +1,3 @@
-"""SQLAlchemy ORM models for the job application tracker schema."""
-
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -32,8 +30,6 @@ class Company(Base):
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
     company_site: Mapped[str | None] = mapped_column(Text, nullable=True)
     company_description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The user this belongs to. Everything is private: other users never see it (their requests get 404).
-    # ondelete=CASCADE: deleting the account deletes its companies too.
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="company")
@@ -46,9 +42,7 @@ class Company(Base):
 class Job(Base):
     __tablename__ = "job"
     __table_args__ = (
-        # A user can save a link only once; different users can save the same link (each has their own job).
         UniqueConstraint("user_id", "job_url", name="uq_job_user_id_job_url"),
-        # Named to match the names PostgreSQL gave them, so Alembic autogenerate can match them up.
         CheckConstraint("application_deadline >= job_posting_date", name="job_check"),
         CheckConstraint("exp_min >= 0", name="job_exp_min_check"),
         CheckConstraint("exp_max >= 0", name="job_exp_max_check"),
@@ -64,7 +58,6 @@ class Job(Base):
 
     job_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     role: Mapped[str] = mapped_column(String(255), nullable=False)
-    # Optional, so an application can be tracked without pasting the whole description.
     JD: Mapped[str | None] = mapped_column(Text, nullable=True)
     job_url: Mapped[str] = mapped_column(Text, nullable=False)
     job_posting_date: Mapped[date] = mapped_column(Date, nullable=False)
@@ -78,7 +71,6 @@ class Job(Base):
     salary_currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
     salary_period: Mapped[str | None] = mapped_column(String(20), nullable=True)
     company_id: Mapped[str] = mapped_column(String(100), ForeignKey("company.company_id"), nullable=False)
-    # Same as Company.user_id: private to this user, deleted with the account.
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     company: Mapped["Company"] = relationship(back_populates="jobs")
@@ -124,28 +116,21 @@ class Application(Base):
     job_id: Mapped[str] = mapped_column(String(100), ForeignKey("job.job_id"), nullable=False)
     date_applied: Mapped[date] = mapped_column(Date, nullable=False, server_default=text("CURRENT_DATE"))
     current_status: Mapped[str | None] = mapped_column(String(30), nullable=True, server_default=text("'Applied'"))
-    # default= is used for new rows made in Python; server_default= lets the database fill in 0
-    # for applications that already exist when the migration adds this column.
     interview_rounds: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     job: Mapped["Job"] = relationship(back_populates="applications")
-    # passive_deletes: the database's ON DELETE CASCADE removes the history, so SQLAlchemy doesn't load it first.
     status_changes: Mapped[list["ApplicationStatusChange"]] = relationship(passive_deletes=True)
     user: Mapped["User"] = relationship(back_populates="applications")
 
 
 class ApplicationStatusChange(Base):
-    """One status change of an application, e.g. Applied -> Interview, recorded automatically by the API."""
-
     __tablename__ = "application_status_change"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    # ondelete="CASCADE": deleting an application (or its user) deletes its history in the database.
     application_id: Mapped[int] = mapped_column(
         ForeignKey("application.application_id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # None for the first entry, when the application was created.
     from_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
     to_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -154,8 +139,6 @@ class ApplicationStatusChange(Base):
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
-        # Unique ignoring upper/lower case, so "Rudra" and "rudra" can't both sign up,
-        # even if two sign-ups happen at the same moment and both pass the check in routers/helpers.py.
         Index("uq_users_username_lower", func.lower(text("username")), unique=True),
         Index("uq_users_email_lower", func.lower(text("email")), unique=True),
     )
@@ -165,8 +148,6 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     image_file: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    # Stored inside every login token. Changing or resetting the password adds 1, which makes
-    # all older tokens invalid (they still carry the old number).
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     applications: Mapped[list["Application"]] = relationship(back_populates="user", passive_deletes=True)
@@ -174,8 +155,6 @@ class User(Base):
 
     @property
     def image_path(self) -> str | None:
-        """URL of the profile picture, or None if the user hasn't uploaded one."""
-
         if not self.image_file:
             return None
         return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/profile_pics/{self.image_file}"
@@ -186,7 +165,6 @@ class PasswordResetToken(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    # Only the SHA-256 hash is stored, so a leaked database can't be used to reset passwords.
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
@@ -196,10 +174,8 @@ class PasswordResetToken(Base):
 
 class Location(Base):
     __tablename__ = "location"
-    # Each user has their own list, so names only need to be unique per user.
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_location_user_id_name"),)
 
-    # Identity(): PostgreSQL picks the next id number automatically when a row is added.
     loc_id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -216,7 +192,6 @@ class Location(Base):
 
 class WorkMode(Base):
     __tablename__ = "work_mode"
-    # Each user has their own list, so names only need to be unique per user.
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_work_mode_user_id_name"),)
 
     work_mode_id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
@@ -231,7 +206,6 @@ class WorkMode(Base):
 
 class Skill(Base):
     __tablename__ = "skill"
-    # Each user has their own list, so names only need to be unique per user.
     __table_args__ = (UniqueConstraint("user_id", "skill_name", name="uq_skill_user_id_skill_name"),)
 
     skill_id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
@@ -246,7 +220,6 @@ class Skill(Base):
 
 class EducationRequirement(Base):
     __tablename__ = "education_requirement"
-    # Each user has their own list, so names only need to be unique per user.
     __table_args__ = (
         UniqueConstraint("user_id", "education_name", name="uq_education_requirement_user_id_education_name"),
     )
@@ -265,7 +238,6 @@ class EducationRequirement(Base):
 
 class Source(Base):
     __tablename__ = "source"
-    # Each user has their own list, so names only need to be unique per user.
     __table_args__ = (UniqueConstraint("user_id", "source_name", name="uq_source_user_id_source_name"),)
 
     source_id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)

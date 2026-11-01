@@ -32,11 +32,6 @@ router = APIRouter()
 
 
 def filter_companies(query: Select, q: str | None, user_id: int) -> Select:
-    """Keep only the user's own companies, and of those the ones whose name contains q (any upper/lower case).
-
-    Also used by the /companies page.
-    """
-
     query = query.where(models.Company.user_id == user_id)
     if q and q.strip():
         query = query.where(models.Company.company_name.ilike(contains_pattern(q.strip()), escape="\\"))
@@ -52,7 +47,6 @@ async def get_companies(
     q: Annotated[str | None, Query(max_length=100, description="Text to find in the company name")] = None,
 ):
     query = filter_companies(select(models.Company), q, current_user.id)
-    # A-Z by name; company_id breaks ties so companies with the same name keep a fixed order between pages.
     query = query.order_by(models.Company.company_name, models.Company.company_id)
     page = await paginate(query, db, skip, limit)
 
@@ -112,13 +106,11 @@ async def update_company(
 @router.delete("/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_company(company_id: str, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     company = await get_company_or_404(company_id, current_user.id, db)
-    # Only need to know if at least one job exists, so fetch a single row.
     result = await db.execute(select(models.Job.job_id).where(models.Job.company_id == company_id).limit(1))
     if result.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Company has related jobs and cannot be deleted"
         )
-    # Its locations are part of the company itself, so they go with it.
     await db.execute(delete(models.CompanyLocation).where(models.CompanyLocation.company_id == company_id))
     await db.delete(company)
     await commit_or_raise_conflict(db)
@@ -146,8 +138,6 @@ async def get_company_locations(
 async def replace_company_locations(
     company_id: str, data: CompanyLocations, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    """Replace the company's locations with the list sent (an empty list removes them all)."""
-
     await get_company_or_404(company_id, current_user.id, db)
     await ensure_ids_exist(models.Location.loc_id, data.location_ids, "Location", current_user.id, db)
     await db.execute(delete(models.CompanyLocation).where(models.CompanyLocation.company_id == company_id))

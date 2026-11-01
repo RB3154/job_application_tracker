@@ -1,12 +1,10 @@
 {% extends "layout.html" %}
 {% block content %}
-    <!-- The page has three states; JavaScript shows one once it knows if you're logged in. -->
     <div id="loadingState" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
     </div>
-    <!-- Logged out: welcome page -->
     <div id="welcomeState" class="d-none">
         <section class="content-section hero mb-4">
             <div class="hero-icon mb-3"><i class="bi bi-briefcase-fill"></i></div>
@@ -43,7 +41,6 @@
             </div>
         </div>
     </div>
-    <!-- Logged in: dashboard -->
     <div id="dashboardState" class="d-none">
         <div class="page-header">
             <div>
@@ -53,7 +50,6 @@
             <button type="button" class="btn btn-primary" data-open-form="application"><i class="bi bi-plus-lg me-1"></i>Add application</button>
         </div>
         <div class="row g-3 mb-4" id="stats"></div>
-        <!-- Needs attention: filled in by dashboard.js, hidden when there's nothing to show -->
         <section class="content-section attention-panel p-3 mb-4 d-none" id="attentionPanel" aria-labelledby="attentionTitle"></section>
         <section class="content-section">
             <div class="d-flex flex-column flex-lg-row gap-3 justify-content-between align-items-lg-start p-3 border-bottom">
@@ -69,7 +65,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Board view: one column per status, cards drawn by dashboard.js -->
             <div class="board p-3 d-none" id="boardView"></div>
             <div class="table-responsive" id="tableView">
                 <table class="table applications-table">

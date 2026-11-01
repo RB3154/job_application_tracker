@@ -1,30 +1,20 @@
-// Small helpers shared by the pages: safe HTML, formatting, toasts and dialogs.
-// The format* functions match the Jinja macros in templates/_macros.html, so cards
-// added by "Load more" look the same as the ones rendered by the server.
-
-// Same list as ApplicationStatus in schemas.py.
 export const STATUSES = ["Wishlist", "Applied", "Screening", "Interview", "Offer", "Accepted", "Rejected", "Withdrawn"];
 
-// XSS prevention: always escape text from the API before putting it into innerHTML.
 export function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text ?? "";
   return div.innerHTML;
 }
 
-// Only allow http(s) links, so a saved "javascript:..." URL can't run code when clicked.
 export function safeUrl(url) {
   return /^https?:\/\//i.test(url ?? "") ? url : null;
 }
 
-// Parse "2026-10-29" as a local date. new Date("2026-10-29") would read it as UTC
-// midnight, which shows as the previous day in timezones behind UTC.
 function parseDate(dateString) {
   const [year, month, day] = dateString.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
-// "2026-10-29" -> "Oct 29, 2026"
 export function formatDate(dateString) {
   if (!dateString) {
     return "";
@@ -36,7 +26,6 @@ export function formatDate(dateString) {
   });
 }
 
-// Today as "YYYY-MM-DD" in the user's timezone (the format <input type="date"> uses).
 export function todayISO() {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60000;
@@ -99,12 +88,10 @@ export function deadlineBadge(deadline) {
   return `<span class="badge bg-body-secondary text-body">Apply by ${formatDate(deadline)}</span>`;
 }
 
-// First letter for avatars and company "logos".
 export function initial(text) {
   return escapeHtml((text || "?").trim().charAt(0).toUpperCase());
 }
 
-// The user's uploaded picture, or a colored circle with their first letter.
 export function avatarHtml(user, size = 32) {
   if (user.image_path) {
     return `<img class="avatar" src="${escapeHtml(user.image_path)}" alt="" width="${size}" height="${size}">`;
@@ -112,7 +99,6 @@ export function avatarHtml(user, size = 32) {
   return `<span class="avatar avatar-initial" style="width:${size}px;height:${size}px;font-size:${size * 0.45}px">${initial(user.username)}</span>`;
 }
 
-// Read a form into a plain object. Empty fields become null, so optional values are cleared.
 export function formToObject(form) {
   const data = {};
   for (const [key, value] of new FormData(form).entries()) {
@@ -122,7 +108,6 @@ export function formToObject(form) {
   return data;
 }
 
-// Disable a button and show a spinner while a request runs.
 export function setButtonLoading(button, loading, loadingText = "Saving...") {
   if (loading) {
     button.dataset.originalHtml = button.innerHTML;
@@ -134,7 +119,6 @@ export function setButtonLoading(button, loading, loadingText = "Saving...") {
   }
 }
 
-// A small message in the bottom-right corner that disappears by itself.
 export function showToast(message, type = "success") {
   const icons = { success: "bi-check-circle-fill", danger: "bi-exclamation-triangle-fill", info: "bi-info-circle-fill" };
   const toast = document.createElement("div");
@@ -150,12 +134,10 @@ export function showToast(message, type = "success") {
   bootstrap.Toast.getOrCreateInstance(toast, { delay: type === "danger" ? 6000 : 3500 }).show();
 }
 
-// A toast to show on the *next* page, for when we redirect or reload right after saving.
 export function queueToast(message, type = "success") {
   try {
     sessionStorage.setItem("queuedToast", JSON.stringify({ message, type }));
   } catch {
-    // Storage blocked (e.g. private mode): the redirect still happens, just without the message.
   }
 }
 
@@ -167,7 +149,6 @@ export function showQueuedToast() {
       showToast(queued.message, queued.type);
     }
   } catch {
-    // Nothing queued, or storage blocked.
   }
 }
 
@@ -181,7 +162,6 @@ export function hideModal(modalId) {
   bootstrap.Modal.getInstance(document.getElementById(modalId))?.hide();
 }
 
-// "Are you sure?" dialog. Resolves to true if the user clicks the confirm button.
 export function confirmDialog(message, { title = "Are you sure?", confirmText = "Delete" } = {}) {
   const modalElement = document.getElementById("confirmModal");
   modalElement.querySelector(".modal-title").textContent = title;

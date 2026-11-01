@@ -1,6 +1,3 @@
-// The "New / Edit company", "New / Edit job" and quick "Add application" modals from layout.html.
-// They are opened from the navbar ("Add" menu) and from the company and job pages.
-
 import { apiFetch, fetchAllPages } from "/static/js/api.js";
 import {
   STATUSES,
@@ -25,15 +22,12 @@ function fillForm(form, values) {
       continue;
     }
     const value = values[element.name] ?? "";
-    // Keep a saved value that isn't one of the dropdown's options (e.g. salary period "annum").
     if (element.tagName === "SELECT" && value && ![...element.options].some((option) => option.value === value)) {
       element.add(new Option(value, value));
     }
     element.value = value;
   }
 }
-
-/* ---------- Company form ---------- */
 
 const companyForm = document.getElementById("companyForm");
 let editingCompany = null;
@@ -73,8 +67,6 @@ companyForm.addEventListener("submit", async (event) => {
   }
 });
 
-/* ---------- Job form ---------- */
-
 const jobForm = document.getElementById("jobForm");
 let editingJob = null;
 
@@ -99,7 +91,6 @@ async function loadCompanyOptions(selectedId) {
   }
 }
 
-// `companyId` preselects a company, e.g. when adding a job from a company's page.
 export function openJobForm(job = null, { companyId = null } = {}) {
   editingJob = job;
   jobForm.reset();
@@ -139,12 +130,9 @@ jobForm.addEventListener("submit", async (event) => {
   }
 });
 
-/* ---------- Quick "Add application" form ---------- */
-
 const quickForm = document.getElementById("quickApplicationForm");
 quickForm.current_status.innerHTML = STATUSES.map((status) => `<option>${status}</option>`).join("");
 
-// `companyName` prefills the company, e.g. when adding from a company's page.
 export async function openQuickApplicationForm({ companyName = null } = {}) {
   quickForm.reset();
   quickForm.querySelectorAll("details").forEach((section) => (section.open = false));
@@ -154,14 +142,12 @@ export async function openQuickApplicationForm({ companyName = null } = {}) {
   quickForm.date_applied.value = todayISO();
   showModal("quickApplicationModal");
 
-  // Suggest existing companies as the user types. If loading fails, typing a name still works.
   try {
     const companies = await fetchAllPages("/api/companies", "companies");
     document.getElementById("quickCompanyOptions").innerHTML = companies
       .map((company) => `<option value="${escapeHtml(company.company_name)}"></option>`)
       .join("");
   } catch {
-    // Not needed to add an application.
   }
 }
 
@@ -175,14 +161,12 @@ quickForm.addEventListener("submit", async (event) => {
     data.salary_currency = data.salary_currency?.toUpperCase() ?? null;
     await apiFetch("/api/applications/quick", { method: "POST", body: data });
     queueToast("Application added");
-    // Show it on My applications (reload if that's where we already are).
     if (window.location.pathname === "/") {
       window.location.reload();
     } else {
       window.location.href = "/";
     }
   } catch (error) {
-    // e.g. 409 "This user has already applied to this job" when the link belongs to a job already tracked.
     showFormError(quickForm, error.message);
     setButtonLoading(submitButton, false);
   }

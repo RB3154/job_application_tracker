@@ -1,17 +1,9 @@
-"""add application notes and status history
-
-Revision ID: 8535d075e734
-Revises: e0b41fa1a607
-Create Date: 2026-10-30 16:00:00.000000
-
-"""
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
 
 
-# revision identifiers, used by Alembic.
 revision: str = '8535d075e734'
 down_revision: Union[str, Sequence[str], None] = 'e0b41fa1a607'
 branch_labels: Union[str, Sequence[str], None] = None
@@ -19,7 +11,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
     op.add_column('application', sa.Column('notes', sa.Text(), nullable=True))
     op.create_table(
         'application_status_change',
@@ -37,7 +28,6 @@ def upgrade() -> None:
         ['application_id'],
         unique=False,
     )
-    # Give applications that already exist a starting point: their status at the time history began.
     op.execute(
         'INSERT INTO application_status_change (application_id, from_status, to_status) '
         'SELECT application_id, NULL, current_status FROM application'
@@ -45,7 +35,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
     op.drop_index(op.f('ix_application_status_change_application_id'), table_name='application_status_change')
     op.drop_table('application_status_change')
     op.drop_column('application', 'notes')

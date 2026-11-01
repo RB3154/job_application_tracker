@@ -1,5 +1,3 @@
-"""PostgreSQL database configuration for the application."""
-
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.engine import URL, make_url
@@ -10,8 +8,6 @@ from config import settings
 
 
 def _async_postgresql_database_url(database_url: str) -> URL:
-    """Return a PostgreSQL URL configured for SQLAlchemy's asyncpg driver."""
-
     url = make_url(database_url)
     if url.drivername not in {
         "postgresql",
@@ -29,11 +25,9 @@ AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_co
 
 
 class Base(DeclarativeBase):
-    """Base class for the project's SQLAlchemy ORM models."""
+    pass
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Yield an async database session for use as a FastAPI dependency."""
-
     async with AsyncSessionLocal() as db:
         yield db

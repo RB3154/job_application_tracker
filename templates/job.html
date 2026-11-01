@@ -9,7 +9,6 @@
     </nav>
     <div class="row g-4">
         <div class="col-lg-8">
-            <!-- Header -->
             <section class="content-section p-4 mb-4">
                 <div class="d-flex flex-column flex-sm-row gap-3">
                     <span class="company-logo lg" aria-hidden="true">{{ job.company.company_name[:1] | upper }}</span>
@@ -39,7 +38,6 @@
                     </button>
                 </div>
             </section>
-            <!-- Details -->
             {% set job_salary = salary(job) %}
             {% set job_experience = experience(job) %}
             <section class="content-section p-4 mb-4">
@@ -69,7 +67,6 @@
                     <dd><code>{{ job.job_id }}</code></dd>
                 </dl>
             </section>
-            <!-- Skills and education (only when the job has them) -->
             {% set required_skills = job.job_skills | selectattr("skill_type", "ne", "preferred") | list %}
             {% set preferred_skills = job.job_skills | selectattr("skill_type", "eq", "preferred") | list %}
             {% if job.job_skills or job.job_educations %}
@@ -103,7 +100,6 @@
                     {% endif %}
                 </section>
             {% endif %}
-            <!-- Job description (optional) -->
             <section class="content-section p-4 mb-4">
                 <h2 class="section-title">Job description</h2>
                 {% if job.JD %}
@@ -113,7 +109,6 @@
                 {% endif %}
             </section>
         </div>
-        <!-- Your application (filled in by JavaScript, because it needs the login token) -->
         <div class="col-lg-4">
             <aside class="content-section p-4 position-sticky" style="top: calc(var(--navbar-height) + 1.5rem)">
                 <h2 class="section-title">Your application</h2>
@@ -126,7 +121,6 @@
             </aside>
         </div>
     </div>
-    <!-- Track / update application modal -->
     <div class="modal fade" id="applicationModal" tabindex="-1" aria-labelledby="applicationModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content" id="applicationForm">
@@ -163,7 +157,6 @@
                 </form>
         </div>
     </div>
-    <!-- Skills & locations modal. The pickers inside are built by static/js/pickers.js. -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <form class="modal-content" id="detailsForm">
@@ -258,7 +251,6 @@
           loadHistory();
         }
 
-        // Status timeline from GET /api/applications/{id}/history, newest at the top.
         async function loadHistory() {
           const historyBox = document.getElementById("historyBox");
           try {
@@ -278,12 +270,9 @@
               .join("");
             historyBox.innerHTML = `<p class="section-title mb-2">History</p><ul class="list-unstyled mb-0">${items}</ul>`;
           } catch {
-            // The history is extra information; the rest of the box still works without it.
           }
         }
 
-        // Moving a Wishlist item on (e.g. to Applied) means you applied today: suggest today's date,
-        // unless the date was already changed by hand. It can still be edited before saving.
         applicationForm.current_status.addEventListener("change", () => {
           const leavingWishlist = application?.current_status === "Wishlist" && applicationForm.current_status.value !== "Wishlist";
           if (leavingWishlist && applicationForm.date_applied.value === application.date_applied) {
@@ -308,7 +297,6 @@
             date_applied: applicationForm.date_applied.value,
             current_status: applicationForm.current_status.value,
             interview_rounds: Number(applicationForm.interview_rounds.value),
-            // An empty box clears the notes.
             notes: applicationForm.notes.value.trim() || null,
           };
           setButtonLoading(submitButton, true);
@@ -346,11 +334,8 @@
           }
         });
 
-        /* ---------- Skills & locations ---------- */
-
         const detailsForm = document.getElementById("detailsForm");
         const detailsError = detailsForm.querySelector(".form-error");
-        // Keys match the lists in GET /api/jobs/{id}/details.
         const pickers = {
           locations: createPicker(document.getElementById("locationsPicker"), { endpoint: "/api/locations", noun: "location" }),
           work_modes: createPicker(document.getElementById("workModesPicker"), { endpoint: "/api/work-modes", noun: "work mode" }),
@@ -364,7 +349,6 @@
           const button = event.currentTarget;
           setButtonLoading(button, true, "Loading...");
           try {
-            // The pickers' option lists only need loading once; the job's current details every time.
             const [details] = await Promise.all([
               apiFetch(`${jobPath}/details`),
               pickersLoaded || Promise.all(Object.values(pickers).map((picker) => picker.load())),
@@ -405,7 +389,6 @@
           }
         });
 
-        // The application box depends on who is logged in.
         const user = await getCurrentUser();
         if (!user) {
           const next = encodeURIComponent(window.location.pathname);
@@ -414,7 +397,6 @@
             <a class="btn btn-primary w-100" href="/login?next=${next}">Log in</a>`;
         } else {
           try {
-            // There's no "my application for job X" endpoint, so look through the user's applications.
             const applications = await fetchAllPages("/api/applications", "applications");
             application = applications.find((item) => item.job_id === job.job_id) ?? null;
             renderApplication();

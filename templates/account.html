@@ -10,7 +10,6 @@
                 <i class="bi bi-box-arrow-right me-1"></i>Log out
             </button>
         </div>
-        <!-- Profile picture -->
         <section class="content-section p-4 mb-4">
             <h2 class="section-title">Profile picture</h2>
             <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-4">
@@ -28,7 +27,6 @@
                 </div>
             </div>
         </section>
-        <!-- Profile details -->
         <section class="content-section p-4 mb-4">
             <h2 class="section-title">Profile</h2>
             <form id="updateProfileForm">
@@ -45,7 +43,6 @@
                 <button type="submit" class="btn btn-primary mt-3">Save profile</button>
             </form>
         </section>
-        <!-- Change password -->
         <section class="content-section p-4 mb-4">
             <h2 class="section-title">Change password</h2>
             <form id="changePasswordForm">
@@ -68,7 +65,6 @@
                 <button type="submit" class="btn btn-primary mt-3">Change password</button>
             </form>
         </section>
-        <!-- Danger zone -->
         <section class="content-section p-4 mb-4 border-danger-subtle">
             <h2 class="section-title text-danger">Danger zone</h2>
             <p class="text-muted-soft">
@@ -92,7 +88,6 @@
 
         let user = null;
 
-        // Show the user's details everywhere on the page, including the navbar.
         function renderUser() {
           avatarPreview.innerHTML = avatarHtml(user, 96);
           removeBtn.classList.toggle("d-none", !user.image_path);
@@ -103,7 +98,6 @@
           document.getElementById("navAvatar").innerHTML = avatarHtml(user, 28);
         }
 
-        // Preview the chosen picture before uploading it.
         pictureInput.addEventListener("change", () => {
           const file = pictureInput.files[0];
           if (!file) {
@@ -124,7 +118,6 @@
           formData.append("file", pictureInput.files[0]);
           setButtonLoading(uploadBtn, true, "Uploading...");
           try {
-            // FormData is sent as multipart/form-data; the browser sets that header itself.
             user = await apiFetch("/api/users/me/picture", { method: "PATCH", body: formData });
             showToast("Profile picture updated");
           } catch (error) {
@@ -153,7 +146,6 @@
         profileForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           const submitButton = profileForm.querySelector("[type=submit]");
-          // PATCH only what changed, so an unchanged username isn't checked against itself.
           const changes = {};
           const username = profileForm.username.value.trim();
           const email = profileForm.email.value.trim();
@@ -202,7 +194,6 @@
                 new_password: newPasswordInput.value,
               },
             });
-            // The old token stopped working when the password changed; keep using the new one.
             setToken(data.access_token);
             passwordForm.reset();
             showToast(data.message);

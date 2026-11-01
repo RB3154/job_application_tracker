@@ -1,12 +1,3 @@
-"""HTML pages for the browser frontend.
-
-These routes return Jinja2 templates instead of JSON and are hidden from /docs.
-Everything is private: apart from the welcome, login, sign-up and password reset pages,
-every page needs the login cookie (PageUser) and only shows the logged-in user's own data.
-Jobs and companies are rendered on the server; the dashboard and account page load their
-data with JavaScript calling the /api routes.
-"""
-
 from datetime import date
 from typing import Annotated
 
@@ -42,12 +33,10 @@ async def jobs_page(
     db: Annotated[AsyncSession, Depends(get_db)],
     filters: Annotated[JobFilters, Query()],
 ):
-    # Same filters and order as GET /api/jobs, so "Load more" continues exactly where this page stops.
     query = filter_jobs(select(models.Job).options(selectinload(models.Job.company)), filters, user.id)
     query = query.order_by(models.Job.job_posting_date.desc(), models.Job.job_id)
     page = await paginate(query, db, skip=0, limit=settings.items_per_page)
 
-    # Choices for the filter dropdowns: the user's own list entries, A-Z.
     async def own_entries(model, name_column):
         result = await db.execute(select(model).where(model.user_id == user.id).order_by(name_column))
         return result.scalars().all()
@@ -77,7 +66,6 @@ async def jobs_page(
 
 @router.get("/jobs/{job_id}", name="job_page")
 async def job_page(request: Request, user: PageUser, job_id: str, db: Annotated[AsyncSession, Depends(get_db)]):
-    # Loads the job's company, locations, skills, etc. up front, so the template can show them.
     job = await get_job_with_details_or_404(job_id, user.id, db)
 
     return templates.TemplateResponse(
@@ -86,7 +74,6 @@ async def job_page(request: Request, user: PageUser, job_id: str, db: Annotated[
         {
             "title": job.role[:50],
             "job": job,
-            # The same JSON the API returns, so the page's JavaScript can prefill the Edit form.
             "job_data": JobResponse.model_validate(job).model_dump(mode="json"),
             "today": date.today(),
         },
@@ -129,8 +116,6 @@ async def company_page(request: Request, user: PageUser, company_id: str, db: An
     if company is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
 
-    # Same order as the Jobs page: newest posting first, then job_id A-Z for jobs posted the same day.
-    # (A minus sign on the date's day number flips just the date to newest-first.)
     jobs = sorted(company.jobs, key=lambda job: (-job.job_posting_date.toordinal(), job.job_id))
 
     return templates.TemplateResponse(
@@ -169,6 +154,5 @@ async def forgot_password_page(request: Request):
 @router.get("/reset-password", name="reset_password_page")
 async def reset_password_page(request: Request):
     response = templates.TemplateResponse(request, "reset_password.html", {"title": "Reset password"})
-    # The reset token is in this page's URL; don't leak it to the CDNs the page loads CSS/JS from.
     response.headers["Referrer-Policy"] = "no-referrer"
     return response

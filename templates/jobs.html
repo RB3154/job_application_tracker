@@ -12,7 +12,6 @@
             <i class="bi bi-plus-lg"></i> New job
         </button>
     </div>
-    <!-- Filters: a normal GET form, so the filters end up in the URL (/jobs?q=...&location_id=...). -->
     <form class="content-section p-3 mb-4" method="get" action="{{ url_for('jobs_page') }}" role="search">
         <div class="row g-2 align-items-end">
             <div class="col-md-4">
@@ -87,14 +86,12 @@
         import { apiFetch, getCompany } from "/static/js/api.js";
         import { deadlineBadge, escapeHtml, formatDate, formatExperience, formatSalary, initial, setButtonLoading, showToast } from "/static/js/utils.js";
 
-        // Pagination state, starting after the jobs the server already rendered.
         let currentOffset = {{ limit }};
         const limit = {{ limit }};
 
         const jobsContainer = document.getElementById("jobsContainer");
         const loadMoreBtn = document.getElementById("loadMoreBtn");
 
-        // Same HTML as the job_card macro in _macros.html.
         function createJobHTML(job, company) {
           const companyName = company?.company_name ?? job.company_id;
           const jobUrl = `/jobs/${encodeURIComponent(job.job_id)}`;
@@ -126,12 +123,10 @@
         async function loadMoreJobs() {
           setButtonLoading(loadMoreBtn, true, "Loading...");
           try {
-            // Send the filters this page was opened with (they're in its URL), plus the next page's position.
             const params = new URLSearchParams(window.location.search);
             params.set("skip", currentOffset);
             params.set("limit", limit);
             const data = await apiFetch(`/api/jobs?${params}`);
-            // The API only gives company_id, so look up each company's name (cached in api.js).
             const companies = await Promise.all(data.jobs.map((job) => getCompany(job.company_id)));
             data.jobs.forEach((job, index) => {
               jobsContainer.insertAdjacentHTML("beforeend", createJobHTML(job, companies[index]));

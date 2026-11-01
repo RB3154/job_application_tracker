@@ -18,18 +18,12 @@ from routers.pages import templates
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Release async database connections on shutdown.
-
-    Tables are not created here: Alembic migrations (`alembic upgrade head`) own the schema.
-    """
-
     yield
     await engine.dispose()
 
 
 app = FastAPI(lifespan=lifespan)
 
-# slowapi finds the limiter on app.state; the handler turns "too many requests" into a 429 JSON error.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
@@ -44,18 +38,11 @@ app.include_router(lookups.education_router, prefix="/api/education", tags=["loo
 app.include_router(lookups.sources_router, prefix="/api/sources", tags=["lookup lists"])
 app.include_router(pages.router)
 
-# CSS, JavaScript and icons used by the HTML pages.
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.middleware("http")
 async def revalidate_static_files(request: Request, call_next):
-    """Make the browser check for a newer CSS/JS file on every page load.
-
-    Without this, browsers may keep using an old copy after a file changes. If the file hasn't
-    changed, the server answers with a tiny "304 Not Modified", so this stays fast.
-    """
-
     response = await call_next(request)
     if request.url.path.startswith("/static"):
         response.headers["Cache-Control"] = "no-cache"
@@ -63,15 +50,11 @@ async def revalidate_static_files(request: Request, call_next):
 
 
 def wants_json(request: Request) -> bool:
-    """API calls get JSON errors; pages opened in the browser get the HTML error page."""
-
     return request.url.path.startswith(("/api", "/static"))
 
 
 @app.exception_handler(LoginRequired)
 async def login_required_handler(_request: Request, exception: LoginRequired):
-    """A page that needs login was opened while logged out: go to the login page, then come back."""
-
     return RedirectResponse(f"/login?next={quote(exception.next_url, safe='')}", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -97,7 +80,6 @@ async def general_http_exception_handler(request: Request, exception: StarletteH
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request: Request, exception: RequestValidationError):
     if wants_json(request):
-        # jsonable_encoder turns the ValueError objects inside some errors into text; plain JSON can't handle them.
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={"detail": jsonable_encoder(exception.errors())},

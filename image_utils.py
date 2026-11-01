@@ -1,5 +1,3 @@
-"""Processing user profile pictures and storing them in AWS S3."""
-
 import uuid
 from io import BytesIO
 
@@ -23,17 +21,10 @@ def _get_s3_client():
 
 
 def process_profile_image(content: bytes) -> tuple[bytes, str]:
-    """Crop the uploaded image to a 300x300 JPEG and return its bytes and new filename.
-
-    Raises PIL.UnidentifiedImageError if the bytes are not an image.
-    """
-
     with Image.open(BytesIO(content)) as original:
-        # Phones store rotation in EXIF data; apply it so the picture isn't sideways.
         img = ImageOps.exif_transpose(original)
         img = ImageOps.fit(img, (300, 300), method=Image.Resampling.LANCZOS)
 
-        # JPEG has no transparency, so convert images that do (e.g. PNG) to plain RGB.
         if img.mode != "RGB":
             img = img.convert("RGB")
 
@@ -46,7 +37,6 @@ def process_profile_image(content: bytes) -> tuple[bytes, str]:
 
 def _upload_to_s3(file_bytes: bytes, key: str) -> None:
     s3 = _get_s3_client()
-    # Without the ContentType, browsers may download the picture instead of showing it.
     s3.upload_fileobj(
         BytesIO(file_bytes),
         settings.s3_bucket_name,
@@ -60,7 +50,6 @@ def _delete_from_s3(key: str) -> None:
     s3.delete_object(Bucket=settings.s3_bucket_name, Key=key)
 
 
-# boto3 is not async, so run its network calls in a thread instead of blocking the event loop.
 async def upload_profile_image(file_bytes: bytes, filename: str) -> None:
     await run_in_threadpool(_upload_to_s3, file_bytes, f"profile_pics/{filename}")
 

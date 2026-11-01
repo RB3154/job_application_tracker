@@ -55,7 +55,6 @@
             <p class="mb-0">No jobs saved for this company yet.</p>
         </div>
     {% endfor %}
-    <!-- Company locations modal. The picker inside is built by static/js/pickers.js. -->
     <div class="modal fade" id="locationsModal" tabindex="-1" aria-labelledby="locationsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable">
             <form class="modal-content" id="locationsForm">
@@ -140,7 +139,6 @@
             queueToast("Company deleted");
             window.location.href = "/companies";
           } catch (error) {
-            // e.g. 409 "Company has related jobs and cannot be deleted"
             showToast(error.message, "danger");
           }
         });

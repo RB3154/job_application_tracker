@@ -1,13 +1,9 @@
-// The My applications page (templates/home.html): stats, filters, the table and board views, and the
-// "Needs attention" panel. Everything here needs the login token, so it's loaded by JavaScript.
-
 import { apiFetch, fetchAllPages, getCompany, getCurrentUser, getJob } from "/static/js/api.js";
 import { STATUSES, confirmDialog, deadlineBadge, escapeHtml, formatDate, showToast } from "/static/js/utils.js";
 
 const ACTIVE_STATUSES = ["Applied", "Screening", "Interview"];
 const CLOSED_STATUSES = ["Accepted", "Rejected", "Withdrawn"];
 
-// Board columns, left to right. Closed applications share one column that starts folded up.
 const BOARD_COLUMNS = [
   { title: "Wishlist", statuses: ["Wishlist"] },
   { title: "Applied", statuses: ["Applied"] },
@@ -17,13 +13,11 @@ const BOARD_COLUMNS = [
   { title: "Closed", statuses: CLOSED_STATUSES, foldable: true },
 ];
 
-// "Needs attention" rules.
-const DEADLINE_WARNING_DAYS = 7; // Wishlist jobs closing within this many days
-const FOLLOW_UP_AFTER_DAYS = 14; // Applied with no status change for this many days
+const DEADLINE_WARNING_DAYS = 7;
+const FOLLOW_UP_AFTER_DAYS = 14;
 
 const VIEW_STORAGE_KEY = "dashboardView";
 
-// All of the user's applications, each with its job and company attached for display.
 let applications = [];
 let statusFilter = "All";
 let searchText = "";
@@ -45,7 +39,6 @@ function show(stateId) {
   }
 }
 
-// The chosen view is remembered in this browser only; if storage is blocked, the table is used.
 function loadSavedView() {
   try {
     return localStorage.getItem(VIEW_STORAGE_KEY) === "board" ? "board" : "table";
@@ -58,11 +51,9 @@ function saveView() {
   try {
     localStorage.setItem(VIEW_STORAGE_KEY, view);
   } catch {
-    // Not remembered next time, which is fine.
   }
 }
 
-// Whole days from `from` to today (dates or ISO date-times; times of day are ignored).
 function daysSince(value) {
   const day = value.length === 10 ? new Date(`${value}T00:00:00`) : new Date(value);
   day.setHours(0, 0, 0, 0);
@@ -94,7 +85,6 @@ function statusSelectHTML(app) {
     </select>`;
 }
 
-// The applications that match the status filter and the search box; both views show these.
 function visibleApplications() {
   const query = searchText.toLowerCase();
   return applications.filter((app) => {
@@ -105,9 +95,7 @@ function visibleApplications() {
 }
 
 function renderStats() {
-  // Wishlist items haven't been applied to yet, so they're counted on their own, not in the totals.
   const total = applications.length - countBy(["Wishlist"]);
-  // "Heard back" = anything past Applied, not counting ones you withdrew yourself.
   const considered = total - countBy(["Withdrawn"]);
   const heardBack = considered - countBy(["Applied"]);
   const responseRate = considered > 0 ? `${Math.round((heardBack / considered) * 100)}%` : "–";
@@ -149,8 +137,6 @@ function renderFilters() {
     .join("");
 }
 
-/* ---------- Needs attention ---------- */
-
 function attentionItems() {
   const items = [];
   for (const app of applications) {
@@ -164,14 +150,12 @@ function attentionItems() {
       }
     }
     if (app.current_status === "Applied") {
-      // No history yet (shouldn't happen for new applications) -> count from the date applied.
       const quietDays = daysSince(app.last_status_change ?? app.date_applied);
       if (quietDays >= FOLLOW_UP_AFTER_DAYS) {
         items.push({ app, icon: "bi-hourglass-bottom", text: `Applied ${quietDays} days ago with no update. Time to follow up?`, sortKey: 1000 - quietDays });
       }
     }
   }
-  // Deadlines first (soonest first), then the longest-waiting applications.
   return items.sort((a, b) => a.sortKey - b.sortKey);
 }
 
@@ -200,8 +184,6 @@ function renderAttention() {
     </ul>`;
 }
 
-/* ---------- Table view ---------- */
-
 function rowHTML(app) {
   return `
     <tr data-id="${app.application_id}">
@@ -225,8 +207,6 @@ function rowHTML(app) {
 function renderTable(visible) {
   tbody.innerHTML = visible.map(rowHTML).join("");
 }
-
-/* ---------- Board view ---------- */
 
 function cardHTML(app) {
   const isClosed = CLOSED_STATUSES.includes(app.current_status);
@@ -270,8 +250,6 @@ function renderBoard(visible) {
   }).join("");
 }
 
-/* ---------- Putting it together ---------- */
-
 function renderView() {
   const visible = visibleApplications();
   for (const button of viewToggle.querySelectorAll("[data-view]")) {
@@ -308,11 +286,9 @@ function renderAll() {
   renderView();
 }
 
-// Save a change to one application and redraw the dashboard with the server's answer.
 async function updateApplication(app, changes) {
   try {
     const updated = await apiFetch(`/api/applications/${app.application_id}`, { method: "PATCH", body: changes });
-    // The single-application response doesn't include last_status_change, so keep or update it here.
     const lastStatusChange = changes.current_status ? new Date().toISOString() : app.last_status_change;
     Object.assign(app, updated, { last_status_change: lastStatusChange });
     showToast("Application updated");
@@ -350,7 +326,6 @@ viewToggle.addEventListener("click", (event) => {
   }
 });
 
-// One listener per view handles the status dropdown in every row or card ("event delegation").
 for (const container of [tbody, boardView]) {
   container.addEventListener("change", (event) => {
     if (event.target.dataset.action === "status") {
@@ -391,9 +366,7 @@ tbody.addEventListener("click", async (event) => {
 
 async function loadDashboard(user) {
   document.getElementById("greeting").textContent = `Hi, ${user.username}`;
-  // The counts need every application, so fetch all pages (100 at a time) instead of just the first.
   const items = await fetchAllPages("/api/applications", "applications");
-  // An application only stores job_id, and a job only stores company_id: look both up (each fetched once).
   applications = await Promise.all(
     items.map(async (app) => {
       const job = await getJob(app.job_id);

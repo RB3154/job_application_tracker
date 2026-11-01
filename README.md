@@ -88,7 +88,8 @@ Interactive API docs are also available while the app runs, at `/docs`
 | Jinja2 | HTML templates for the frontend pages |
 | Bootstrap 5 + Bootstrap Icons | Frontend styling and components (loaded from a CDN) |
 | ruff (dev) | Linting and code formatting |
-| pytest (dev) | Test runner (set up; tests are still to be written) |
+| pytest (dev) | Test runner for the suite in `tests/` |
+| moto (dev) | Fake AWS S3 used by the tests |
 
 ---
 
@@ -204,11 +205,22 @@ http://127.0.0.1:8000/docs   Swagger UI
 uv run ruff check        # find problems (unused imports, long lines, import order, ...)
 uv run ruff check --fix  # fix the ones ruff can fix safely
 uv run ruff format       # format the code
-uv run pytest            # run the tests in tests/ (still to be written)
+uv run pytest            # run the tests in tests/
 ```
 
 The ruff settings are in `pyproject.toml`: 120-character lines, two blank
 lines after imports (this project's style), and `alembic/versions` left alone.
+
+The tests need an empty PostgreSQL database, created once. Its name is your
+`DATABASE_URL` database name plus `_test`:
+
+```sql
+CREATE DATABASE job_application_tracker_test;
+```
+
+They never touch your real database, S3 bucket or inbox: S3 and email are
+faked, and `tests/conftest.py` refuses to run on a database whose name doesn't
+end in `_test`.
 
 ---
 
@@ -216,7 +228,6 @@ lines after imports (this project's style), and `alembic/versions` left alone.
 
 The following are not implemented yet:
 
-- Automated tests (pytest is set up; the tests are still to be written)
 - Notes and status history on the dashboard (they are on the job page)
 - Rate limit counts shared between server processes (they live in memory,
   see [Rate Limiting](docs/auth.md#rate-limiting))
@@ -264,9 +275,9 @@ Application Notes & Status History
   ↓
 Tracker Redesign (Add application form, Wishlist, board, needs attention)
   ↓
-Private Per-user Data & Login-only Pages         ← current
+Private Per-user Data & Login-only Pages
   ↓
-Automated Tests (pytest)
+Automated Tests (pytest)                         ← current
   ↓
 Analytics
   ↓

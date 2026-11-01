@@ -7,7 +7,6 @@
         <form id="loginForm">
             <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
-                <!-- name="username" because OAuth2PasswordRequestForm calls the field username; we put the email in it. -->
                 <input type="email" class="form-control" id="email" name="username" required autocomplete="email" autofocus>
             </div>
             <div class="mb-3">
@@ -32,21 +31,16 @@
         const loginForm = document.getElementById("loginForm");
         const formError = document.querySelector(".form-error");
 
-        // Where to go after logging in: the page that sent us here (?next=/jobs/abc), or the dashboard.
-        // Only same-site paths are allowed, so a link like ?next=https://evil.example can't redirect away.
         function nextPage() {
           const next = new URLSearchParams(window.location.search).get("next");
           return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
         }
 
-        // Already logged in? Skip the form. Pages need the login cookie too, which browsers that logged in
-        // before it existed don't have yet, so copy the token into it first (otherwise the page sends us back here).
         if (await getCurrentUser()) {
           try {
             await apiFetch("/api/users/session", { method: "POST" });
             window.location.replace(nextPage());
           } catch {
-            // Couldn't set the cookie: stay here and log in with the form, which sets it.
           }
         }
 
@@ -57,7 +51,6 @@
           setButtonLoading(submitButton, true, "Logging in...");
 
           try {
-            // OAuth2PasswordRequestForm expects form data, not JSON, so send the FormData as-is.
             const data = await apiFetch("/api/users/token", { method: "POST", body: new FormData(loginForm) });
             setToken(data.access_token);
             queueToast("Logged in. Welcome back!");
