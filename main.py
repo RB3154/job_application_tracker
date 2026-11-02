@@ -1,16 +1,21 @@
 from contextlib import asynccontextmanager
+from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from auth import LoginRequired
-from database import engine
+from config import settings
+from database import engine, get_db
 from rate_limit import limiter, rate_limit_exceeded_handler
 from routers import applications, companies, jobs, lookups, pages, users
 from routers.pages import templates
@@ -41,16 +46,64 @@ app.include_router(pages.router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+class LimitRequestSize:
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        detail = "Request is too large"
+        content_length = dict(scope["headers"]).get(b"content-length", b"0")
+        if content_length.isdigit() and int(content_length) > self.max_bytes:
+            response = JSONResponse({"detail": detail}, status_code=status.HTTP_413_CONTENT_TOO_LARGE)
+            await response(scope, receive, send)
+            return
+
+        received = 0
+
+        async def limited_receive():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=detail)
+            return message
+
+        await self.app(scope, limited_receive, send)
+
+
+app.add_middleware(LimitRequestSize, max_bytes=settings.max_upload_size_bytes + 1024 * 1024)
+
+
 @app.middleware("http")
-async def revalidate_static_files(request: Request, call_next):
+async def add_response_headers(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/static"):
-        response.headers["Cache-Control"] = "no-cache"
+    response.headers["Cache-Control"] = "no-cache" if request.url.path.startswith("/static") else "no-store"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    if "Referrer-Policy" not in response.headers:
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
 
+@app.get("/health", include_in_schema=False)
+async def health_check(db: Annotated[AsyncSession, Depends(get_db)]):
+    try:
+        await db.execute(text("SELECT 1"))
+    except (SQLAlchemyError, OSError) as exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable"
+        ) from exception
+    return {"status": "healthy"}
+
+
 def wants_json(request: Request) -> bool:
-    return request.url.path.startswith(("/api", "/static"))
+    return request.url.path.startswith(("/api", "/static", "/health"))
 
 
 @app.exception_handler(LoginRequired)

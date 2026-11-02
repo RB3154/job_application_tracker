@@ -118,6 +118,7 @@ to hammer (`rate_limit.py`):
 
 | Route | Limit | Why |
 | --- | --- | --- |
+| `POST /api/users` | 10 per hour | Stops mass sign-ups, because password hashing is deliberately slow |
 | `POST /api/users/token` | 5 per minute | Slows down password guessing |
 | `POST /api/users/forgot-password` | 3 per hour | Stops flooding an inbox with reset emails |
 | `POST /api/users/reset-password` | 5 per minute | Slows down guessing reset tokens |
@@ -128,8 +129,10 @@ Going over the limit returns `429` with
 - The counts are kept in the server's memory: they reset when the server
   restarts and aren't shared between several server processes. A shared store
   such as Redis would be needed for that.
-- Behind a proxy (e.g. nginx) every request seems to come from the proxy's IP,
-  so the proxy's forwarded-for header has to be trusted when deploying.
+- Behind a proxy (e.g. nginx or Caddy) every request seems to come from the
+  proxy's IP, so its forwarded-for header has to be trusted, from that proxy only.
+  The Docker image has no proxy yet, so it ignores that header: anyone could
+  fake it to get around the limits.
 - In tests, set `limiter.enabled = False` (from `rate_limit`) so repeated
   logins don't hit the limits.
 

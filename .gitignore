@@ -17,3 +17,6 @@ wheels/
 
 # Uploaded profile pictures
 media/
+
+# Local archives
+*.zip

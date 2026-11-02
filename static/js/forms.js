@@ -159,6 +159,7 @@ quickForm.addEventListener("submit", async (event) => {
   try {
     const data = formToObject(quickForm);
     data.salary_currency = data.salary_currency?.toUpperCase() ?? null;
+    data.job_posting_date ??= todayISO();
     await apiFetch("/api/applications/quick", { method: "POST", body: data });
     queueToast("Application added");
     if (window.location.pathname === "/") {

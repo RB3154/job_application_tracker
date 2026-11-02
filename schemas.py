@@ -29,7 +29,15 @@ ApplicationStatus = Literal[
 ]
 
 
+MAX_WEB_ADDRESS_BYTES = 2000
+MAX_DESCRIPTION_LENGTH = 50_000
+MAX_SHORT_TEXT_LENGTH = 500
+MAX_INTERVIEW_ROUNDS = 100
+
+
 def check_web_address(value: str) -> str:
+    if len(value.encode()) > MAX_WEB_ADDRESS_BYTES:
+        raise ValueError("must be 2000 characters or fewer")
     parts = urlparse(value)
     if parts.scheme.lower() not in ("http", "https") or not parts.netloc:
         raise ValueError("must be a web address starting with http:// or https://")
@@ -42,7 +50,7 @@ WebAddress = Annotated[str, AfterValidator(check_web_address)]
 class CompanyBase(BaseModel):
     company_name: str = Field(min_length=1, max_length=255)
     company_site: WebAddress | None = None
-    company_description: str | None = None
+    company_description: str | None = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
 
 
 class CompanyCreate(CompanyBase):
@@ -59,7 +67,7 @@ class CompanyResponse(CompanyBase):
 class CompanyUpdate(BaseModel):
     company_name: str = Field(default=None, min_length=1, max_length=255)
     company_site: WebAddress | None = None
-    company_description: str | None = None
+    company_description: str | None = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
 
 
 class PaginatedCompaniesResponse(BaseModel):
@@ -81,16 +89,16 @@ def check_job_ranges(job) -> None:
 
 class JobBase(BaseModel):
     role: str = Field(min_length=1, max_length=255)
-    JD: str | None = None
+    JD: str | None = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
     job_url: WebAddress = Field(min_length=1)
     job_posting_date: date
     application_deadline: date | None = None
-    exp_min: Decimal | None = Field(default=None, ge=0)
-    exp_max: Decimal | None = Field(default=None, ge=0)
-    exp_text: str | None = None
-    salary_text: str | None = None
-    salary_min: Decimal | None = Field(default=None, ge=0)
-    salary_max: Decimal | None = Field(default=None, ge=0)
+    exp_min: Decimal | None = Field(default=None, ge=0, max_digits=4, decimal_places=1)
+    exp_max: Decimal | None = Field(default=None, ge=0, max_digits=4, decimal_places=1)
+    exp_text: str | None = Field(default=None, max_length=MAX_SHORT_TEXT_LENGTH)
+    salary_text: str | None = Field(default=None, max_length=MAX_SHORT_TEXT_LENGTH)
+    salary_min: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
+    salary_max: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
     salary_currency: str | None = Field(default=None, min_length=3, max_length=3)
     salary_period: str | None = Field(default=None, max_length=20)
     company_id: str = Field(min_length=1, max_length=100)
@@ -114,16 +122,16 @@ class JobResponse(JobBase):
 
 class JobUpdate(BaseModel):
     role: str = Field(default=None, min_length=1, max_length=255)
-    JD: str | None = None
+    JD: str | None = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
     job_url: WebAddress = Field(default=None, min_length=1)
     job_posting_date: date = None
     application_deadline: date | None = None
-    exp_min: Decimal | None = Field(default=None, ge=0)
-    exp_max: Decimal | None = Field(default=None, ge=0)
-    exp_text: str | None = None
-    salary_text: str | None = None
-    salary_min: Decimal | None = Field(default=None, ge=0)
-    salary_max: Decimal | None = Field(default=None, ge=0)
+    exp_min: Decimal | None = Field(default=None, ge=0, max_digits=4, decimal_places=1)
+    exp_max: Decimal | None = Field(default=None, ge=0, max_digits=4, decimal_places=1)
+    exp_text: str | None = Field(default=None, max_length=MAX_SHORT_TEXT_LENGTH)
+    salary_text: str | None = Field(default=None, max_length=MAX_SHORT_TEXT_LENGTH)
+    salary_min: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
+    salary_max: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
     salary_currency: str | None = Field(default=None, min_length=3, max_length=3)
     salary_period: str | None = Field(default=None, max_length=20)
     company_id: str = Field(default=None, min_length=1, max_length=100)
@@ -202,7 +210,7 @@ class JobSkillItem(BaseModel):
 
 class JobEducationItem(BaseModel):
     education_id: int
-    note: str | None = None
+    note: str | None = Field(default=None, max_length=MAX_SHORT_TEXT_LENGTH)
 
 
 class JobDetails(BaseModel):
@@ -255,7 +263,7 @@ class ApplicationBase(BaseModel):
     job_id: str = Field(min_length=1, max_length=100)
     date_applied: date | None = None
     current_status: ApplicationStatus | None = None
-    interview_rounds: int = Field(default=0, ge=0)
+    interview_rounds: int = Field(default=0, ge=0, le=MAX_INTERVIEW_ROUNDS)
     notes: str | None = Field(default=None, max_length=5000)
 
 
@@ -269,23 +277,23 @@ class QuickApplicationCreate(BaseModel):
     job_url: WebAddress = Field(min_length=1)
     current_status: ApplicationStatus = "Applied"
     date_applied: date | None = None
-    interview_rounds: int = Field(default=0, ge=0)
+    interview_rounds: int = Field(default=0, ge=0, le=MAX_INTERVIEW_ROUNDS)
     notes: str | None = Field(default=None, max_length=5000)
 
     job_posting_date: date | None = None
     application_deadline: date | None = None
-    exp_min: Decimal | None = Field(default=None, ge=0)
-    exp_max: Decimal | None = Field(default=None, ge=0)
-    exp_text: str | None = None
-    salary_text: str | None = None
-    salary_min: Decimal | None = Field(default=None, ge=0)
-    salary_max: Decimal | None = Field(default=None, ge=0)
+    exp_min: Decimal | None = Field(default=None, ge=0, max_digits=4, decimal_places=1)
+    exp_max: Decimal | None = Field(default=None, ge=0, max_digits=4, decimal_places=1)
+    exp_text: str | None = Field(default=None, max_length=MAX_SHORT_TEXT_LENGTH)
+    salary_text: str | None = Field(default=None, max_length=MAX_SHORT_TEXT_LENGTH)
+    salary_min: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
+    salary_max: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
     salary_currency: str | None = Field(default=None, min_length=3, max_length=3)
     salary_period: str | None = Field(default=None, max_length=20)
-    JD: str | None = None
+    JD: str | None = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
 
     company_site: WebAddress | None = None
-    company_description: str | None = None
+    company_description: str | None = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
 
     @model_validator(mode="after")
     def validate_ranges(self) -> "QuickApplicationCreate":
@@ -304,16 +312,16 @@ class ApplicationResponse(ApplicationBase):
 class ApplicationReplace(BaseModel):
     job_id: str = Field(min_length=1, max_length=100)
     date_applied: date
-    current_status: ApplicationStatus | None = None
-    interview_rounds: int = Field(default=0, ge=0)
+    current_status: ApplicationStatus = "Applied"
+    interview_rounds: int = Field(default=0, ge=0, le=MAX_INTERVIEW_ROUNDS)
     notes: str | None = Field(default=None, max_length=5000)
 
 
 class ApplicationUpdate(BaseModel):
     job_id: str = Field(default=None, min_length=1, max_length=100)
     date_applied: date = None
-    current_status: ApplicationStatus | None = None
-    interview_rounds: int = Field(default=None, ge=0)
+    current_status: ApplicationStatus = None
+    interview_rounds: int = Field(default=None, ge=0, le=MAX_INTERVIEW_ROUNDS)
     notes: str | None = Field(default=None, max_length=5000)
 
 

@@ -1,0 +1,27 @@
+# Secrets: these are passed to the container when it starts, never stored in the image
+.env
+.env.*
+
+# Git and editor files
+.git/
+.gitignore
+.vscode/
+
+# Python environment and caches (the image installs its own)
+.venv/
+.python-version
+__pycache__/
+*.py[oc]
+.pytest_cache/
+.ruff_cache/
+
+# Not needed to run the app
+tests/
+docs/
+media/
+README.md
+Dockerfile
+.dockerignore
+*.zip
+*.png
+aws_*.json

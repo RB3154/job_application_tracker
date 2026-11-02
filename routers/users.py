@@ -45,7 +45,8 @@ DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-timing")
 
 
 @router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
-async def create_user(user_data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit("10/hour")
+async def create_user(request: Request, user_data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     await ensure_username_available(user_data.username, db)
     await ensure_email_available(user_data.email, db)
     user = models.User(

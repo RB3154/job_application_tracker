@@ -1,11 +1,18 @@
+import logging
 import uuid
 from io import BytesIO
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from PIL import Image, ImageOps
 from starlette.concurrency import run_in_threadpool
 
 from config import settings
+
+
+logger = logging.getLogger(__name__)
+
+Image.MAX_IMAGE_PIXELS = 25_000_000
 
 
 def _get_s3_client():
@@ -57,4 +64,7 @@ async def upload_profile_image(file_bytes: bytes, filename: str) -> None:
 async def delete_profile_image(filename: str | None) -> None:
     if filename is None:
         return
-    await run_in_threadpool(_delete_from_s3, f"profile_pics/{filename}")
+    try:
+        await run_in_threadpool(_delete_from_s3, f"profile_pics/{filename}")
+    except (BotoCoreError, ClientError):
+        logger.exception("Could not delete profile picture %r from S3", filename)

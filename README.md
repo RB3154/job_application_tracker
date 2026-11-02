@@ -56,6 +56,7 @@ The details live in `docs/`:
 | [docs/api.md](docs/api.md) | Everything the `/api/...` endpoints do: resources and their rules, every endpoint, ownership, lookup lists, pagination, search and filters, PUT vs PATCH, and errors. |
 | [docs/architecture.md](docs/architecture.md) | How the code is organized: routers, the request flow, the async setup, `main.py`, settings, and what each file contains. |
 | [docs/database.md](docs/database.md) | The PostgreSQL schema, its constraints, the SQLAlchemy models and Pydantic schemas, and the Alembic migrations. |
+| [docs/deploy_aws.md](docs/deploy_aws.md) | Running the app on AWS with Docker: ECR, EC2, RDS, updates and troubleshooting. |
 | [docs/auth.md](docs/auth.md) | Login, JWT tokens, logging out other devices, protected routes, rate limiting, and password reset. |
 | [docs/frontend.md](docs/frontend.md) | The Jinja2 + JavaScript pages: what each page does, how pages get their data, login in the browser, and the frontend files. |
 
@@ -83,7 +84,7 @@ Interactive API docs are also available while the app runs, at `/docs`
 | Pillow | Profile picture cropping and resizing |
 | boto3 | Storing profile pictures in AWS S3 |
 | aiosmtplib | Sending password reset emails asynchronously over SMTP |
-| slowapi | Rate limiting login and password reset requests |
+| slowapi | Rate limiting registration, login and password reset requests |
 | uv | Python package and environment management |
 | Jinja2 | HTML templates for the frontend pages |
 | Bootstrap 5 + Bootstrap Icons | Frontend styling and components (loaded from a CDN) |
@@ -235,8 +236,7 @@ The following are not implemented yet:
   `BackgroundTasks`)
 - Caching
 - Notifications and reminders (e.g. for application deadlines)
-- Deployment configuration (including a request size limit and trusted proxy
-  headers in front of the app)
+- HTTPS (see [Deploying to AWS](docs/deploy_aws.md#adding-https-before-real-use))
 
 These features can be added incrementally as the project grows.
 
@@ -277,17 +277,17 @@ Tracker Redesign (Add application form, Wishlist, board, needs attention)
   ↓
 Private Per-user Data & Login-only Pages
   ↓
-Automated Tests (pytest)                         ← current
+Automated Tests (pytest)
+  ↓
+Docker & AWS Deployment                          ← current
   ↓
 Analytics
   ↓
 Production Backend Improvements
-  ↓
-Deployment
 ```
 
-Everything up to and including private per-user data and login-only pages
-is implemented.
+Everything up to and including the automated tests is implemented. The Docker
+setup is ready, and the AWS steps are in [docs/deploy_aws.md](docs/deploy_aws.md).
 
 The exact implementation order may evolve as the project develops.
 

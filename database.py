@@ -20,7 +20,7 @@ def _async_postgresql_database_url(database_url: str) -> URL:
     return url.set(drivername="postgresql+asyncpg")
 
 
-engine = create_async_engine(_async_postgresql_database_url(settings.database_url))
+engine = create_async_engine(_async_postgresql_database_url(settings.database_url), pool_pre_ping=True)
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

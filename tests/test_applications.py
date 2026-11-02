@@ -339,6 +339,29 @@ async def test_replace_application_resets_fields_left_out(client: AsyncClient, h
     assert data["interview_rounds"] == 0
 
 
+async def test_replace_application_left_out_status_goes_back_to_applied(client: AsyncClient, headers: dict):
+    application = await create_application(client, headers, current_status="Interview")
+
+    response = await client.put(
+        f"/api/applications/{application['application_id']}",
+        json={"job_id": application["job_id"], "date_applied": "2026-03-01"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["current_status"] == "Applied"
+
+
+async def test_update_application_rejects_empty_status(client: AsyncClient, headers: dict):
+    application = await create_application(client, headers)
+
+    response = await client.patch(
+        f"/api/applications/{application['application_id']}", json={"current_status": None}, headers=headers
+    )
+
+    assert response.status_code == 422
+
+
 async def test_replace_application_needs_required_fields(client: AsyncClient, headers: dict):
     application = await create_application(client, headers)
 
@@ -615,7 +638,12 @@ async def test_quick_create_same_link_for_different_users(client: AsyncClient, h
         {"current_status": "Hired"},
         {"current_status": None},
         {"interview_rounds": -1},
+        {"interview_rounds": 101},
         {"notes": "x" * 5001},
+        {"job_url": "https://example.com/" + "x" * 2000},
+        {"JD": "x" * 50_001},
+        {"exp_max": 1000},
+        {"salary_max": "1234567890123456"},
         {"exp_min": 5, "exp_max": 1},
         {"salary_min": 5, "salary_max": 1},
         {"job_posting_date": "2026-02-01", "application_deadline": "2026-01-01"},

@@ -685,3 +685,35 @@ async def test_reset_password_rate_limit(client: AsyncClient, rate_limits_on):
     response = await client.post("/api/users/reset-password", json=body)
 
     assert response.status_code == 429
+
+
+async def test_register_rate_limit(client: AsyncClient, rate_limits_on):
+    for number in range(10):
+        await create_test_user(client, username=f"user{number}", email=f"user{number}@example.com")
+
+    response = await client.post(
+        "/api/users", json={"username": "onemore", "email": "onemore@example.com", "password": "testpassword123"}
+    )
+
+    assert response.status_code == 429
+
+
+async def test_delete_picture_s3_failure_still_succeeds(client: AsyncClient, headers: dict, mocked_aws):
+    await client.patch("/api/users/me/picture", files=upload(make_image_bytes()), headers=headers)
+    error = ClientError({"Error": {"Code": "AccessDenied", "Message": "Denied"}}, "DeleteObject")
+
+    with patch("image_utils._delete_from_s3", side_effect=error):
+        response = await client.delete("/api/users/me/picture", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["image_file"] is None
+
+
+async def test_delete_account_s3_failure_still_succeeds(client: AsyncClient, headers: dict, mocked_aws):
+    await client.patch("/api/users/me/picture", files=upload(make_image_bytes()), headers=headers)
+    error = ClientError({"Error": {"Code": "AccessDenied", "Message": "Denied"}}, "DeleteObject")
+
+    with patch("image_utils._delete_from_s3", side_effect=error):
+        response = await client.delete("/api/users/me", headers=headers)
+
+    assert response.status_code == 204

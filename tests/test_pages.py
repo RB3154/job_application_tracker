@@ -1,9 +1,13 @@
 from datetime import timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
 
 from auth import create_access_token
+from config import settings
+from database import get_db
+from main import app
 from tests.conftest import (
     auth_header,
     create_company,
@@ -307,3 +311,61 @@ async def test_missing_static_file_gives_json_error(client: AsyncClient):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Not Found"
+
+
+async def test_health_check(client: AsyncClient):
+    response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "healthy"}
+
+
+async def test_health_check_when_database_is_down(client: AsyncClient):
+    async def broken_db():
+        session = AsyncMock()
+        session.execute.side_effect = OSError("connection refused")
+        yield session
+
+    app.dependency_overrides[get_db] = broken_db
+
+    response = await client.get("/health")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database unavailable"}
+
+
+async def test_security_headers(client: AsyncClient):
+    response = await client.get("/login")
+
+    assert response.headers["x-frame-options"] == "SAMEORIGIN"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["cache-control"] == "no-store"
+
+
+async def test_static_files_are_revalidated_not_blocked_from_caching(client: AsyncClient):
+    response = await client.get("/static/css/main.css")
+
+    assert response.headers["cache-control"] == "no-cache"
+
+
+async def test_too_large_request_is_rejected(client: AsyncClient):
+    too_large = b"x" * (settings.max_upload_size_bytes + 1024 * 1024 + 1)
+
+    response = await client.post("/api/users/token", content=too_large)
+
+    assert response.status_code == 413
+
+
+async def test_too_large_request_without_content_length_is_rejected(client: AsyncClient):
+    chunk = b"x" * (1024 * 1024)
+    chunk_count = settings.max_upload_size_bytes // len(chunk) + 2
+
+    async def chunks():
+        for _ in range(chunk_count):
+            yield chunk
+
+    response = await client.post("/api/users", content=chunks(), headers={"content-type": "application/json"})
+
+    assert "content-length" not in response.request.headers
+    assert response.status_code == 413

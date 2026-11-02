@@ -88,7 +88,7 @@ Users have:
 A user can only change or delete their own account. Emails are only shown to
 the user themselves.
 
-Login, forgot-password and reset-password are rate limited (see
+Registration, login, forgot-password and reset-password are rate limited (see
 [Rate Limiting](auth.md#rate-limiting)).
 
 Everything is private: each user only ever sees their own companies, jobs,
