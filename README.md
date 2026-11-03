@@ -264,12 +264,13 @@ fine for one server, and would move to Redis to scale out.
 
 This project started alongside **Corey Schafer's FastAPI tutorial**
 ([channel](https://www.youtube.com/@coreyms),
-[playlist](https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH)),
-which taught the core concepts: async CRUD, routers, JWT login, uploads,
-pagination, password reset, Alembic and a Jinja2 frontend.
+[playlist](https://www.youtube.com/playlist?list=PL-osiE80TeTs4UjLw5MM6bV2T6a0cBqXH)).
+It taught the core concepts (async CRUD, routers, JWT login, uploads, pagination,
+password reset and Alembic), and its project structure and Jinja2 + JavaScript
+frontend were the reference I built this app on.
 
-It has since become its own application, with its own schema, models, validation
-rules and features. Added beyond the tutorial:
+On top of that foundation, it has its own schema, models, validation rules and
+features. Added beyond the tutorial:
 
 - Fully private per-user data and login-only pages
 - Logging out other devices after a password change (token versions)
