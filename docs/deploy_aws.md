@@ -157,11 +157,11 @@ DATABASE_URL=postgresql://USERNAME:PASSWORD@RDS_ENDPOINT:5432/job_tracker?ssl=re
 SECRET_KEY=PASTE_THE_NEW_KEY
 S3_BUCKET_NAME=jat-fastapi-project
 S3_REGION=ap-southeast-2
-MAIL_SERVER=sandbox.smtp.mailtrap.io
-MAIL_PORT=2525
-MAIL_USERNAME=YOUR_MAILTRAP_USERNAME
-MAIL_PASSWORD=YOUR_MAILTRAP_PASSWORD
-MAIL_FROM=noreply@example.com
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=YOUR_ADDRESS@gmail.com
+MAIL_PASSWORD=YOUR_16_LETTER_APP_PASSWORD
+MAIL_FROM=YOUR_ADDRESS@gmail.com
 MAIL_USE_TLS=true
 FRONTEND_URL=https://ELASTIC-IP.sslip.io
 COOKIE_SECURE=true
@@ -176,6 +176,17 @@ TZ=Asia/Kolkata
   around midnight.
 - `COOKIE_SECURE=true` only sends the login cookie over HTTPS. Keep it `true`, because
   the site is only reached through Caddy.
+- **Email** goes out through Gmail, so password reset emails reach real inboxes:
+  1. Turn on 2-Step Verification for the Google account at
+     <https://myaccount.google.com/signinoptions/twosv>. App passwords need it.
+  2. Create an app password at <https://myaccount.google.com/apppasswords>, named for
+     example `Job Tracker`. Use its 16 letters **without spaces** as `MAIL_PASSWORD`. It
+     works only for sending mail, never for logging in to the account, and you can delete
+     it there at any time.
+  3. Use the same Gmail address for `MAIL_USERNAME` and `MAIL_FROM`.
+  - Gmail allows about 500 emails a day, which is plenty for a personal tracker.
+  - On your PC, keep using the [Mailtrap](https://mailtrap.io) sandbox in `.env`, so test
+    emails never reach real people.
 
 Then create Caddy's settings file:
 
@@ -376,14 +387,17 @@ Caddy keeps running. You only restart it after you change the Caddyfile:
 | Can't stay logged in | You opened the site over `http://`: use the `https://` address |
 | Everyone gets "Too many attempts" together | The app is trusting the wrong IP: check `--forwarded-allow-ips 172.20.0.2` matches Caddy's `--ip` |
 | Reset link points to localhost | `FRONTEND_URL` isn't set |
-| Reset email never arrives | Mailtrap's sandbox catches all email: check the Mailtrap inbox |
+| Reset email never arrives | The address doesn't belong to any account (the site says "check your email" either way, for privacy), or check Spam. `docker logs jat` shows any sending error |
+| `Username and Password not accepted` from Gmail | Use an app password, not the normal Gmail password, with no spaces, and make sure 2-Step Verification is still on |
+| App passwords page says "not available for your account" | 2-Step Verification is off, or it's a work/school account |
 
 ---
 
 ## Before Real Use
 
-- **Real email:** password reset emails need a real mail provider instead of the Mailtrap
-  sandbox, which catches every email.
+- **A dedicated mail service (optional):** for more than about 500 emails a day, or to send
+  from your own domain, switch from Gmail to a service such as Amazon SES or Resend. Only
+  the `MAIL_` settings change.
 - **Your own domain (optional):** to use one, point it at the Elastic IP, then put it in
   the Caddyfile and in `FRONTEND_URL` in place of the sslip.io name.
 - **Never use `--forwarded-allow-ips '*'`.** It would let anyone fake their IP and get
