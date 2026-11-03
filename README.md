@@ -236,7 +236,8 @@ The following are not implemented yet:
   `BackgroundTasks`)
 - Caching
 - Notifications and reminders (e.g. for application deadlines)
-- HTTPS (see [Deploying to AWS](docs/deploy_aws.md#adding-https-before-real-use))
+- Real password reset emails on AWS (the deploy still uses the Mailtrap sandbox, see
+  [Deploying to AWS](docs/deploy_aws.md#before-real-use))
 
 These features can be added incrementally as the project grows.
 

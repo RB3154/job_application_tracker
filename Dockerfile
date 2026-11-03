@@ -33,6 +33,7 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # One worker keeps the in-memory login rate limits accurate.
-# No proxy sits in front of the app yet, so forwarded IP headers aren't trusted:
-# anyone could fake them to get around the rate limits. Change this when adding HTTPS.
+# By default forwarded IP headers aren't trusted, because anyone could fake them to get
+# around the rate limits. On AWS the app runs behind Caddy, and the run command replaces
+# this line to trust only Caddy's address (see docs/deploy_aws.md, step 8).
 CMD ["fastapi", "run", "main.py", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-proxy-headers"]
