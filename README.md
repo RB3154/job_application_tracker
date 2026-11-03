@@ -10,6 +10,8 @@ deploys and error monitoring.
 
 **Live:** <https://52-64-121-241.sslip.io> (register an account to try it)
 
+![Dashboard with stats, status filters and a tracked application](docs/screenshots/5.png)
+
 ---
 
 ## Highlights
@@ -50,6 +52,67 @@ deploys and error monitoring.
   and password reset by email.
 
 See [docs/api.md](docs/api.md#features) for every rule in detail.
+
+---
+
+## Screenshots
+
+### API
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/8.png" alt="Swagger UI with the five endpoint groups"></td>
+    <td width="50%"><img src="docs/screenshots/9.png" alt="All endpoints for applications"></td>
+  </tr>
+  <tr>
+    <td align="center">Endpoints grouped by resource (Swagger UI)</td>
+    <td align="center">Full CRUD for applications, plus quick create and status history</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/10.png" alt="POST /api/applications request body"></td>
+    <td width="50%"><img src="docs/screenshots/15.png" alt="Health check on the live site"></td>
+  </tr>
+  <tr>
+    <td align="center">Request body for creating an application, validated by Pydantic</td>
+    <td align="center"><code>/health</code> on the live HTTPS site</td>
+  </tr>
+</table>
+
+### Tests and CI/CD
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/11.png" alt="571 tests passing locally"></td>
+    <td width="50%"><img src="docs/screenshots/13.png" alt="GitHub Actions run: test then deploy"></td>
+  </tr>
+  <tr>
+    <td align="center">571 tests passing with pytest</td>
+    <td align="center">Every push to <code>main</code>: test, then deploy</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/14.png" alt="Test job steps: lint, format check, tests"></td>
+    <td width="50%"><img src="docs/screenshots/12.png" alt="Deploy job steps: AWS, ECR, server update, live check"></td>
+  </tr>
+  <tr>
+    <td align="center">Test job: lint, format check and the full test suite</td>
+    <td align="center">Deploy job: build and push to ECR, update EC2, check the live site</td>
+  </tr>
+</table>
+
+### The App
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/1.png" alt="Landing page"></td>
+    <td width="33%"><img src="docs/screenshots/4.png" alt="Add application form"></td>
+    <td width="33%"><img src="docs/screenshots/6.png" alt="Account page with profile picture"></td>
+  </tr>
+  <tr>
+    <td align="center">Landing page</td>
+    <td align="center">One-step Add application</td>
+    <td align="center">Account and profile picture (S3)</td>
+  </tr>
+</table>
 
 ---
 

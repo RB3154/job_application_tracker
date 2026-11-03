@@ -68,7 +68,7 @@
         <section class="content-section p-4 mb-4 border-danger-subtle">
             <h2 class="section-title text-danger">Danger zone</h2>
             <p class="text-muted-soft">
-                Deleting your account also deletes all of your tracked applications. Jobs and companies stay, since everyone shares them.
+                Deleting your account permanently deletes all of your applications, jobs and companies.
             </p>
             <button type="button" class="btn btn-outline-danger" id="deleteAccountBtn">Delete my account</button>
         </section>
@@ -208,7 +208,7 @@
 
         document.getElementById("deleteAccountBtn").addEventListener("click", async () => {
           const confirmed = await confirmDialog(
-            "This permanently deletes your account and all of your tracked applications. This can't be undone.",
+            "This permanently deletes your account and all of your applications, jobs and companies. This can't be undone.",
             { title: "Delete your account?", confirmText: "Delete account" },
           );
           if (!confirmed) {
