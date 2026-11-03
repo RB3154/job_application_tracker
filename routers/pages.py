@@ -19,6 +19,7 @@ from schemas import CompanyResponse, JobFilters, JobResponse
 router = APIRouter(include_in_schema=False)
 
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["show_api_docs"] = settings.show_api_docs
 
 
 @router.get("/", name="home")

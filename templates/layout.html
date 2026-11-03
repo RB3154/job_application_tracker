@@ -140,7 +140,7 @@
         </main>
         <footer class="mt-auto py-3 border-top">
             <div class="container text-center">
-                <small class="text-muted-soft">Job Tracker · built with FastAPI · <a href="/docs">API docs</a></small>
+                <small class="text-muted-soft">Job Tracker · built with FastAPI{% if show_api_docs %} · <a href="/docs">API docs</a>{% endif %}</small>
             </div>
         </footer>
         {% include "_form_modals.html" %}

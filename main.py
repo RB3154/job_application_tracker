@@ -39,7 +39,14 @@ async def lifespan(_app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(lifespan=lifespan)
+def api_docs_urls(show: bool) -> dict[str, str | None]:
+    if show:
+        return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
+# SHOW_API_DOCS=false on the live server hides /docs, /redoc and /openapi.json from everyone.
+app = FastAPI(lifespan=lifespan, **api_docs_urls(settings.show_api_docs))
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)

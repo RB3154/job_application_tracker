@@ -110,7 +110,8 @@ asyncio.run(main())
 IAM → Roles → Create role → trusted entity **EC2**. Attach:
 
 - `AmazonEC2ContainerRegistryReadOnly`, to download the image
-- A new policy with the contents of `aws_iam_policy_rudy_jat.json`, to use the S3 folder
+- A new policy with the contents of `deploy/iam-policy-server-s3.json`, to upload and
+  delete profile pictures in the S3 bucket's `profile_pics/` folder
 
 Name it `jat-ec2-role`.
 
@@ -173,6 +174,7 @@ MAIL_FROM=YOUR_ADDRESS@gmail.com
 MAIL_USE_TLS=true
 FRONTEND_URL=https://ELASTIC-IP.sslip.io
 COOKIE_SECURE=true
+SHOW_API_DOCS=false
 TZ=Asia/Kolkata
 SENTRY_DSN=YOUR_SENTRY_DSN
 SENTRY_ENVIRONMENT=production
@@ -186,6 +188,9 @@ SENTRY_ENVIRONMENT=production
   around midnight.
 - `COOKIE_SECURE=true` only sends the login cookie over HTTPS. Keep it `true`, because
   the site is only reached through Caddy.
+- `SHOW_API_DOCS=false` turns off `/docs`, `/redoc` and `/openapi.json` and removes the
+  footer link, so visitors can't see a map of the API. Leave it out of your PC's `.env` to
+  keep the docs while coding.
 - **Email** goes out through Gmail, so password reset emails reach real inboxes:
   1. Turn on 2-Step Verification for the Google account at
      <https://myaccount.google.com/signinoptions/twosv>. App passwords need it.
@@ -277,6 +282,7 @@ a padlock in the address bar.
 - Enter a wrong password 6 times in a minute. The last attempt should say "Too many attempts".
 - Run `docker restart jat`. Your data should still be there.
 - From your PC, check that `http://ELASTIC_IP:8000` doesn't load.
+- Check that `/docs` shows "Not Found" and the footer has no "API docs" link.
 - Check that `http://ELASTIC_IP` jumps to the `https://` address.
 
 ---

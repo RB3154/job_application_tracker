@@ -32,6 +32,8 @@ class Settings(BaseSettings):
 
     cookie_secure: bool = False
 
+    show_api_docs: bool = True
+
     sentry_dsn: SecretStr | None = None
     sentry_environment: str = "development"
 

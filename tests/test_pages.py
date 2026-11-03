@@ -2,12 +2,14 @@ from datetime import timedelta
 from unittest.mock import AsyncMock
 
 import pytest
-from httpx import AsyncClient
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
 from auth import create_access_token
 from config import settings
 from database import get_db
-from main import app
+from main import api_docs_urls, app
+from routers.pages import templates
 from tests.conftest import (
     auth_header,
     create_company,
@@ -369,3 +371,28 @@ async def test_too_large_request_without_content_length_is_rejected(client: Asyn
 
     assert "content-length" not in response.request.headers
     assert response.status_code == 413
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+async def test_api_docs_are_on_by_default(client: AsyncClient, path: str):
+    response = await client.get(path)
+
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+async def test_api_docs_can_be_turned_off(path: str):
+    docs_off_app = FastAPI(**api_docs_urls(False))
+
+    async with AsyncClient(transport=ASGITransport(app=docs_off_app), base_url="http://test") as docs_off_client:
+        response = await docs_off_client.get(path)
+
+    assert response.status_code == 404
+
+
+async def test_footer_hides_the_docs_link_when_docs_are_off(client: AsyncClient, monkeypatch: pytest.MonkeyPatch):
+    assert 'href="/docs"' in (await client.get("/login")).text
+
+    monkeypatch.setitem(templates.env.globals, "show_api_docs", False)
+
+    assert 'href="/docs"' not in (await client.get("/login")).text
