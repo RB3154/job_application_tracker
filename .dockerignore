@@ -18,6 +18,8 @@ __pycache__/
 # Not needed to run the app
 tests/
 docs/
+deploy/
+.github/
 media/
 README.md
 Dockerfile

@@ -251,10 +251,89 @@ a padlock in the address bar.
 
 ---
 
-## Updating the App
+## Automatic Deploys
 
-On your PC, run the two `docker build` and `docker push` commands from step 2. Then on
-the server:
+Every push to `main` updates the live site through GitHub Actions
+(`.github/workflows/deploy.yml`):
+
+```text
+git push --> run ruff + pytest (throwaway PostgreSQL) --> build image --> push to ECR
+         --> SSH to the server and run deploy/update.sh --> check /health
+```
+
+- If a check fails, nothing is deployed and the live site keeps the old version.
+- Pull requests run only the checks.
+- Each image is tagged with its commit ID, so you can tell which version is live.
+- `deploy/update.sh` pulls the image, runs `alembic upgrade head`, restarts the app and
+  waits until `/health` answers. If the tables fail to update, the old version keeps running.
+
+### One-time setup
+
+**1–2. Give GitHub its own AWS user.** Keyless OIDC login (a GitHub identity provider
+plus a role) is the better option. This account's AWS organization blocks it
+(`iam:CreateOpenIDConnectProvider` is denied by a service control policy), so GitHub
+uses a separate IAM user that can do only one thing.
+
+First, create a policy that can push only to the `job-tracker` repository. IAM → Policies →
+Create policy → JSON:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
+        "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload", "ecr:PutImage"
+      ],
+      "Resource": "arn:aws:ecr:ap-southeast-2:ACCOUNT_ID:repository/job-tracker"
+    }
+  ]
+}
+```
+
+- Name the policy `github-actions-ecr-push`.
+- IAM → Users → Create user `github-actions`, with no console access, and attach only
+  `github-actions-ecr-push`.
+- Open the user → Security credentials → **Create access key** → "Third-party service".
+  Copy both values. The secret is shown only once.
+- If the key ever leaks, the worst anyone can do is push images. Deactivate it in IAM and
+  create a new one.
+
+**3. Give GitHub its own SSH key**, so your personal key never leaves your PC. On your PC:
+
+```powershell
+ssh-keygen -t ed25519 -N '""' -C github-actions-deploy -f github_deploy_key
+```
+
+Add the contents of `github_deploy_key.pub` as a new line in `~/.ssh/authorized_keys` on
+the server. To stop GitHub deploying, delete that line.
+
+**4. Add the secrets.** GitHub repository → Settings → Secrets and variables → Actions →
+New repository secret:
+
+| Name | Value |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID` | The `github-actions` user's access key ID |
+| `AWS_SECRET_ACCESS_KEY` | That key's secret |
+| `EC2_HOST` | The Elastic IP |
+| `EC2_SSH_KEY` | Everything in `github_deploy_key` (the file **without** `.pub`) |
+| `EC2_KNOWN_HOSTS` | The output of `ssh-keyscan -t ed25519 ELASTIC_IP`, so GitHub can check it's really your server |
+
+Then delete `github_deploy_key` from your PC, because GitHub now holds the only copy that's needed.
+
+SSH (port 22) must be open to everyone, because GitHub's machines use a different IP on
+every run. Logging in still needs the key.
+
+**5. Try it.** GitHub → Actions → **Test and deploy** → **Run workflow**, or push a commit.
+
+## Updating the App by Hand
+
+If GitHub Actions isn't available, run the two `docker build` and `docker push` commands
+from step 2 on your PC. Then, on the server, either run `bash update.sh $IMAGE` with a copy
+of `deploy/update.sh`, or run:
 
 ```bash
 docker pull $IMAGE
@@ -290,6 +369,9 @@ Caddy keeps running. You only restart it after you change the Caddyfile:
 | `docker: Address already in use` when starting Caddy | Another container took `172.20.0.2`. Start Caddy first, or give every container a fixed `--ip` |
 | Caddy logs show certificate errors | Port 80 isn't open to everyone, or the sslip.io name doesn't match the Elastic IP |
 | `TypeError` mentioning `sslmode` | Use `?ssl=require` in `DATABASE_URL` |
+| Actions: "not authorized to perform ecr:…" or "invalid security token" | The `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` secrets are wrong, or the user is missing `github-actions-ecr-push` |
+| Actions: "Host key verification failed" | `EC2_KNOWN_HOSTS` is missing or old (it changes when you replace the server) |
+| Actions: "Permission denied (publickey)" | The deploy key's `.pub` line isn't in the server's `~/.ssh/authorized_keys` |
 | Picture upload fails | Hop limit isn't 2, or the role is missing the S3 policy: run `check_s3.py` |
 | Can't stay logged in | You opened the site over `http://`: use the `https://` address |
 | Everyone gets "Too many attempts" together | The app is trusting the wrong IP: check `--forwarded-allow-ips 172.20.0.2` matches Caddy's `--ip` |
