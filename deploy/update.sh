@@ -27,7 +27,9 @@ echo "==> Restarting the app"
 docker rm -f jat >/dev/null 2>&1 || true
 # The words after "$IMAGE" replace the Dockerfile's start command, so the app trusts only Caddy (172.20.0.2)
 # to tell it each visitor's real IP.
+# SENTRY_RELEASE tags each error with the commit that's running.
 docker run -d --name jat --restart unless-stopped --env-file ~/.env \
+  -e SENTRY_RELEASE="${IMAGE##*:}" \
   --network jat-net --ip 172.20.0.10 "$IMAGE" \
   fastapi run main.py --host 0.0.0.0 --port 8000 --workers 1 \
   --proxy-headers --forwarded-allow-ips 172.20.0.2 >/dev/null

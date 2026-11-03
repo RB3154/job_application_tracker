@@ -141,8 +141,16 @@ sudo dnf update -y
 sudo dnf install -y docker
 sudo systemctl enable --now docker
 sudo usermod -aG docker ec2-user
+
+# Keep at most 3 log files of 10 MB per container, so logs can't fill the disk
+echo '{"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}}' | sudo tee /etc/docker/daemon.json
+sudo systemctl restart docker
 exit
 ```
+
+The log limit applies only to containers created after it's set. If you add it to a server
+that's already running, recreate both containers: the Caddy command from step 8, then
+`deploy/update.sh`.
 
 Log back in so the group change applies, then create the settings file:
 
@@ -166,6 +174,8 @@ MAIL_USE_TLS=true
 FRONTEND_URL=https://ELASTIC-IP.sslip.io
 COOKIE_SECURE=true
 TZ=Asia/Kolkata
+SENTRY_DSN=YOUR_SENTRY_DSN
+SENTRY_ENVIRONMENT=production
 ```
 
 - Don't put quote marks around values: Docker keeps them as part of the value.
@@ -187,6 +197,15 @@ TZ=Asia/Kolkata
   - Gmail allows about 500 emails a day, which is plenty for a personal tracker.
   - On your PC, keep using the [Mailtrap](https://mailtrap.io) sandbox in `.env`, so test
     emails never reach real people.
+- **Error alerts** come from [Sentry](https://sentry.io) (free plan). Create a project with
+  platform **FastAPI** and copy its **DSN** into `SENTRY_DSN`. When the live app hits an
+  error, Sentry emails you the error, the line of code and the request.
+  - Sentry sends errors only, with no performance data and no personal data such as emails
+    or IPs. `deploy/update.sh` tags each error with the commit that's running.
+  - Leave `SENTRY_DSN` out of your PC's `.env`, so errors while coding don't send alerts.
+    Without it, Sentry is off.
+  - To send a test message from the server:
+    `docker exec jat python -c "import main, sentry_sdk; sentry_sdk.capture_message('Test'); sentry_sdk.flush()"`
 
 Then create Caddy's settings file:
 
@@ -383,6 +402,8 @@ Caddy keeps running. You only restart it after you change the Caddyfile:
 | Actions: "not authorized to perform ecr:…" or "invalid security token" | The `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` secrets are wrong, or the user is missing `github-actions-ecr-push` |
 | Actions: "Host key verification failed" | `EC2_KNOWN_HOSTS` is missing or old (it changes when you replace the server) |
 | Actions: "Permission denied (publickey)" | The deploy key's `.pub` line isn't in the server's `~/.ssh/authorized_keys` |
+| No Sentry emails | `SENTRY_DSN` is missing from `~/.env` or wrong, or the app wasn't restarted after adding it. Send the test message from step 7 |
+| Disk filling up | Run `df -h` and `docker system df`. Check the log limit is on: `docker inspect -f '{{.HostConfig.LogConfig}}' jat` should show `max-size:10m` |
 | Picture upload fails | Hop limit isn't 2, or the role is missing the S3 policy: run `check_s3.py` |
 | Can't stay logged in | You opened the site over `http://`: use the `https://` address |
 | Everyone gets "Too many attempts" together | The app is trusting the wrong IP: check `--forwarded-allow-ips 172.20.0.2` matches Caddy's `--ip` |

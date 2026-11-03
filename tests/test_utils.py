@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import aiosmtplib
 import pytest
+import sentry_sdk
 from PIL import Image, UnidentifiedImageError
 
 import models
@@ -184,3 +185,8 @@ async def test_reset_email_failure_is_logged_without_the_token(error: Exception,
 
     assert "Could not send the password reset email" in caplog.text
     assert "secret-token" not in caplog.text
+
+
+def test_sentry_is_off_without_a_dsn():
+    assert not settings.sentry_dsn
+    assert not sentry_sdk.get_client().is_active()

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 from urllib.parse import quote
 
+import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -19,6 +20,17 @@ from database import engine, get_db
 from rate_limit import limiter, rate_limit_exceeded_handler
 from routers import applications, companies, jobs, lookups, pages, users
 from routers.pages import templates
+
+
+# Error alerts. Only on when SENTRY_DSN is set, so it stays off on laptops, in tests and in CI.
+# Sends errors only (no performance tracing) and no personal data such as emails or IPs.
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn.get_secret_value(),
+        environment=settings.sentry_environment,
+        send_default_pii=False,
+        traces_sample_rate=0,
+    )
 
 
 @asynccontextmanager

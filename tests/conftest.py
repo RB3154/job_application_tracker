@@ -25,6 +25,8 @@ os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 os.environ.pop("S3_ENDPOINT_URL", None)
 
+os.environ["SENTRY_DSN"] = ""
+
 os.environ["MAIL_SERVER"] = "localhost"
 os.environ["MAIL_USERNAME"] = ""
 os.environ["MAIL_PASSWORD"] = ""
